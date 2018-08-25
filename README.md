@@ -33,8 +33,11 @@ chmod +x ./*
 ├── redis # Redis 安装脚本
 ├── ssh # SSH 初始化脚本
 └── vhost # Nginx 虚拟主机脚本
+
+9 directories, 13 files
 ```
 
+# 默认端口
 | Version              | Port       |
 | -                    | -          |
 | ssh                  | 2316       |
@@ -44,6 +47,7 @@ chmod +x ./*
 | memcached-1.5.9      | 2320       |
 | redis-4.0.11         | 2321       |
 
+# 安装目录
 程序安装目录：
 ```
 /usr/local/<包名>
@@ -62,4 +66,24 @@ chmod +x ./*
 /vat/sites/htdocs/<SITE ID>/www # 虚拟主机根目录
 ```
 
+# 安装顺序
+```
+./init
+./ssh # 注：SSH 禁用了密码登录并自动生成 Key，安装后重启前请手动下载 Key 到本地
+./nginx
+./mariadb
+./php
+./pure-ftpd
+./memcached
+./redis
+```
 
+# 管理服务
+```
+systemctl [status|start|stop|restart] <包名>
+```
+
+# 下载 SSH Key
+```
+scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
+```
