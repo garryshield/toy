@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+
+# Name: const;
+# Desc: an auto web server installation tool;
+# Date: 2013-02-07 by garryshield;
+
+source ./const;
+source ./funs;
+
+echo "${MariaDB} installation";
+echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
+read ;
+read ;
+
+
+# uninstall
+if [ -d ${MariaDBInstallPath} ]; then
+  systemctl stop ${MariaDB}.service;
+  systemctl disable ${MariaDB}.service;
+
+  firewall-cmd --permanent --zone=public --remove-port=${MariaDBPort}/tcp;
+  firewall-cmd --reload;
+
+  mv ${HostSitesPath}/${MariaDB} ${HostSitesPath}/${MariaDB}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+  mv ${MariaDBInstallPath} ${MariaDBInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+fi;
+
+# rm -rf ${MariaDBSrcPath};
+rm -rf ${MariaDBTarPath};
+
+# download
+mkdir -p ${MariaDBSrcPath};
+if [ ! -f ${MariaDBPackPath} ]; then
+  wget ${MariaDBUrlPath} -O ${MariaDBPackPath};
+fi;
+
+# const
+MariaDBEtcPath=${HostSitesPath}/${MariaDB}/etc;
+mkdir -p ${MariaDBEtcPath}/my.cnf.d;
+
+MariaDBLogPath=${HostSitesPath}/${MariaDB}/log;
+mkdir -p ${MariaDBLogPath};
+
+MariaDBVarPath=${HostSitesPath}/${MariaDB}/var;
+mkdir -p ${MariaDBVarPath};
+
+MariaDBDataPath=${HostSitesPath}/${MariaDB}/data;
+mkdir -p ${MariaDBDataPath};
+
+MariaDBSysPath=${HostSitesPath}/${MariaDB}/systemd;
+mkdir -p ${MariaDBSysPath};
+
+# user & group
+remove_user ${MariaDBUser};
+remove_group ${MariaDBGroup};
+groupadd ${MariaDBGroup};
+useradd -s /sbin/nologin -d /dev/null -M -g ${MariaDBGroup} ${MariaDBUser};
+
+# port
+firewall-cmd --permanent --zone=public --add-port=${MariaDBPort}/tcp;
+firewall-cmd --reload;
+
+# installation
+mkdir -p ${MariaDBTarPath};
+
+tar -zxvf ${MariaDBPackPath} -C ${MariaDBTarPath};
+cd ${MariaDBTarPath}/${MariaDB};
+
+mkdir -p ${MariaDBTarPath}/build;
+cd ${MariaDBTarPath}/build;
+
+# configure
+. scl_source enable devtoolset-7;
+
+MariaDBConfigure="\
+  -DCMAKE_INSTALL_PREFIX=${MariaDBInstallPath} \
+  -DINSTALL_MYSQLDATADIR=${MariaDBDataPath} \
+  -DINSTALL_SYSCONFDIR=${MariaDBEtcPath} \
+  -DINSTALL_SYSCONF2DIR=${MariaDBEtcPath}/my.cnf.d \
+  -DINSTALL_UNIX_ADDRDIR=${MariaDBVarPath}/mysql.sock \
+
+  -DMYSQL_DATADIR=${MariaDBDataPath} \
+
+  -DWITH_SYSTEMD=yes \
+
+  -DCONC_WITH_CURL=ON \
+  -DCONC_WITH_SSL=ON \
+  -DENABLED_LOCAL_INFILE=ON \
+";
+
+echo ${MariaDBConfigure} > ../option;
+
+cmake ${MariaDBConfigure} ../${MariaDB}  2> ../configure.err;
+cmake -LAH . > ../configure;
+
+make -j 8 2> ../make.err;
+make -j 8 install 2> ../install.err;
+
+# my.cnf
+echo ;
+echo ;
+echo "my.cnf";
+/bin/cp ${HostSetUpCnfPath}/${MariaDB}/my.cnf ${MariaDBEtcPath}/my.cnf && \
+  echo "${HostSetUpCnfPath}/${MariaDB}/my.cnf ${MariaDBEtcPath}/my.cnf";
+sed -i "s:@ETC_DIR@:${MariaDBEtcPath}:" ${MariaDBEtcPath}/my.cnf;
+
+echo ;
+echo ;
+echo "my.cnf.d/server.cnf";
+/bin/cp ${HostSetUpCnfPath}/${MariaDB}/my.cnf.d/server.cnf ${MariaDBEtcPath}/my.cnf.d/server.cnf && \
+  echo "${HostSetUpCnfPath}/${MariaDB}/my.cnf.d/server.cnf ${MariaDBEtcPath}/my.cnf.d/server.cnf";
+sed -i "s:@PORT@:${MariaDBPort}:" ${MariaDBEtcPath}/my.cnf.d/server.cnf;
+sed -i "s:@SOCKET@:${MariaDBVarPath}/mysql.sock:" ${MariaDBEtcPath}/my.cnf.d/server.cnf;
+sed -i "s:@DATADIR@:${MariaDBDataPath}:" ${MariaDBEtcPath}/my.cnf.d/server.cnf;
+sed -i "s:@LOG_BASENAME@:log_basebase:" ${MariaDBEtcPath}/my.cnf.d/server.cnf;
+
+echo ;
+echo ;
+echo "my.cnf.d/client.cnf";
+/bin/cp ${HostSetUpCnfPath}/${MariaDB}/my.cnf.d/client.cnf ${MariaDBEtcPath}/my.cnf.d/client.cnf && \
+  echo "${HostSetUpCnfPath}/${MariaDB}/my.cnf.d/client.cnf ${MariaDBEtcPath}/my.cnf.d/client.cnf";
+sed -i "s:@PORT@:${MariaDBPort}:" ${MariaDBEtcPath}/my.cnf.d/client.cnf;
+sed -i "s:@SOCKET@:${MariaDBVarPath}/mysql.sock:" ${MariaDBEtcPath}/my.cnf.d/client.cnf;
+
+# mysql_install_db
+echo ;
+echo ;
+echo "mysql_install_db";
+chown -R ${MariaDBUser}:${MariaDBGroup} ${HostSitesPath}/${MariaDB};
+${MariaDBInstallPath}/scripts/mysql_install_db --basedir=${MariaDBInstallPath} --datadir=${MariaDBDataPath} --user=${MariaDBUser};
+
+# mariadb.server
+echo ;
+echo ;
+echo "mariadb.server";
+/bin/cp ${HostSetUpCnfPath}/${MariaDB}/mariadb.service ${MariaDBSysPath}/${MariaDB}.service && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${MariaDB}/mariadb.service ${MariaDBSysPath}/${MariaDB}.service";
+
+sed -i "s:@USER@:${MariaDBUser}:" ${MariaDBSysPath}/${MariaDB}.service;
+sed -i "s:@GROUP@:${MariaDBGroup}:" ${MariaDBSysPath}/${MariaDB}.service;
+sed -i "s:@BIN_DIR@:${MariaDBInstallPath}/bin:" ${MariaDBSysPath}/${MariaDB}.service;
+sed -i "s:@SCRIPTS_DIR@:${MariaDBInstallPath}/scripts:" ${MariaDBSysPath}/${MariaDB}.service;
+
+systemctl enable ${MariaDBSysPath}/${MariaDB}.service;
+
+# done
+echo ;
+echo ;
+echo ================================================================================;
+echo "${MariaDB} installation SUCCESS";
+echo "Configure Command:";
+for itm in ${MariaDBConfigure}; do
+	echo "	"${itm};
+done;
+echo "systemctl {start|stop|reload} ${MariaDB}";
+echo ;
+echo "Run mysql_secure_installation to improve the security installation";
+echo ;
+echo "Add a remote access user with the following command:";
+echo "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'my-password' WITH GRANT OPTION;";
+echo ================================================================================;
+echo ;
+echo ;
+
+exit 0;

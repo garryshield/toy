@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+
+# Name: const;
+# Desc: an auto web server installation tool;
+# Date: 2013-02-07 by garryshield;
+
+source ./const;
+source ./funs;
+
+echo "VHost installation";
+echo '1: create nginx vhost config file';
+echo '2: create php-fpm pool config file';
+echo '4: create pure-ftp support'
+echo '5: create memcached support'
+echo '6: create redis support'
+echo '7: restart nginx, php-fpm, pure-ftp, memcached, redis';
+echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
+read ;
+read ;
+
+echo 'The options which with (*) prefix is required!';
+echo '';
+
+# Unique vhost ID
+echo 'Set an unique vhost ID';
+echo 'take the deamon name is cool';
+echo 'e.g. App URL is <www.domain.com>, you can take <www_domain_com> as ID';
+echo -n '(*) ID:';
+read id;
+if [ "${id:+1}" != 1 ]; then
+	echo 'Error: Must input an unique ID for nginx vhost';
+	exit 1;
+fi;
+echo "ID: ${id}";
+
+echo ;
+echo "Set nginx root dir: (e.g. '/var/sites/htdocs/test')";
+echo 'dir name under /var/sites/htdocs/';
+echo -n '(*) nginx root dir:';
+read ngx_root;
+ngx_root=${ngx_root:=${id}};
+ngx_root=${HostSitesWebPath}/${ngx_root}
+echo "ngx_root: ${ngx_root}";
+
+echo ;
+echo 'Set nginx server name';
+echo 'e.g. 127.0.0.1 test test.com www.test.com';
+echo -n '(*) nginx server name:';
+read ngx_server_name;
+if [ "${ngx_server_name:+1}" != 1 ]; then
+	echo 'Error: Must input an server name for nginx vhost';
+	exit 1;
+fi;
+echo "ngx_server_name: ${ngx_server_name}";
+
+echo ;
+echo 'Set nginx listen: (if not set take 80)';
+echo 'if set as 80 and custom this vhost with SSL(following step)';
+echo 'it will be redefined as 443';
+echo -n 'nginx listen:';
+read ngx_listen;
+ngx_listen=${ngx_listen:=80};
+echo "ngx_listen: ${ngx_listen}";
+
+# FPM pool config file
+echo ;
+echo 'Set pool name: (if not set take vhost ID)';
+echo -n 'pool name:';
+read pool_name;
+pool_name=${pool_name:=${id}};
+echo "pool_name: ${pool_name}";
+
+echo ;
+echo 'Set pool user: (if not set take vhost ID)';
+echo 'user will created if not exists';
+echo -n 'pool user:';
+read pool_user;
+pool_user=${pool_user:=${id}};
+echo "pool_user: ${pool_user}";
+
+echo ;
+echo 'Set pool group: (if not set take pool user)';
+echo "for good manage assign all the www user to one group like 'www'!"
+echo -n 'pool group:';
+read pool_group;
+pool_group=${pool_group:=${pool_user}}
+echo "pool_group: ${pool_group}";
+
+echo ;
+echo 'Set pool listen;'
+echo 'make sure the listen is not used by other poll';
+echo 'e.g. 127.0.0.1:9000';
+echo -n '(*) pool listen:';
+read pool_listen;
+if [ "${pool_listen:+1}" != 1 ]; then
+	echo 'Error: Must input an pool listen for this fpm pool';
+	exit 1;
+fi;
+echo "pool_listen: ${pool_listen}";
+
+mkdir -p ${ngx_root};
+mkdir -p ${ngx_root}/${Php};
+mkdir -p ${ngx_root}/${Nginx};
+mkdir -p ${ngx_root}/www;
+
+groupadd ${pool_group};
+useradd -s /sbin/nologin -d ${ngx_root} -M -g ${pool_group} ${pool_user};
+
+# nginx.conf
+echo ;
+echo ;
+echo "nginx.conf";
+/bin/cp ${HostSetUpCnfPath}/vhost/nginx.conf ${ngx_root}/${Nginx}/nginx.conf && \
+  echo "/bin/cp ${HostSetUpCnfPath}/vhost/nginx.conf ${ngx_root}/${Nginx}/nginx.conf";
+
+sed -i "s:@listen@:${ngx_listen}:" ${ngx_root}/${Nginx}/nginx.conf;
+sed -i "s:@server_name@:${ngx_server_name}:" ${ngx_root}/${Nginx}/nginx.conf;
+sed -i "s:@root@:${ngx_root}/www:" ${ngx_root}/${Nginx}/nginx.conf;
+sed -i "s:@access_log@:${ngx_root}/${Nginx}/access.log:" ${ngx_root}/${Nginx}/nginx.conf;
+sed -i "s:@error_log@:${ngx_root}/${Nginx}/error.log:" ${ngx_root}/${Nginx}/nginx.conf;
+sed -i "s#@fastcgi_pass@#${pool_listen}#" ${ngx_root}/${Nginx}/nginx.conf;
+
+# php-fpm.conf
+echo ;
+echo ;
+echo "php-fpm.conf";
+/bin/cp ${HostSetUpCnfPath}/vhost/php-fpm.conf ${ngx_root}/${Php}/php-fpm.conf && \
+  echo "/bin/cp ${HostSetUpCnfPath}/vhost/php-fpm.conf ${ngx_root}/${Php}/php-fpm.conf";
+
+sed -i "s:@pool_name@:${pool_name}:" ${ngx_root}/${Php}/php-fpm.conf;
+sed -i "s:@pool_user@:${pool_user}:" ${ngx_root}/${Php}/php-fpm.conf;
+sed -i "s:@pool_group@:${pool_group}:" ${ngx_root}/${Php}/php-fpm.conf;
+sed -i "s#@pool_listen@#${pool_listen}#" ${ngx_root}/${Php}/php-fpm.conf;
+sed -i "s:@pool_access_log@:${ngx_root}/${Php}/access.log:" ${ngx_root}/${Php}/php-fpm.conf;
+sed -i "s:@pool_slow_log@:${ngx_root}/${Php}/slow.log:" ${ngx_root}/${Php}/php-fpm.conf;
+
+# pure-ftp
+PureFTPDDataPath=${HostSitesPath}/${PureFTPD}/data;
+echo ;
+echo 'Create pure-ftp account or not? default <yes>';
+echo -n '(*) create ftp account[yes/no]:';
+read pure_ftp;
+pure_ftp=${pure_ftp:='yes'};
+if [ ${pure_ftp} == 'yes' ]; then
+	# pure-ftp user
+	echo "Set pure-ftp user: (if not set take pool user ${pool_user})";
+	echo 'Leave this empty is cool!';
+	echo -n "pure-ftp user:";
+	read pure_ftp_user;
+	pure_ftp_user=${pure_ftp_user:=$pool_user};
+	echo "pure-ftp user: ${pure_ftp_user}";
+
+	# pure-ftp group
+	echo "Set pureftp group: (if not set take pool group ${pool_group})";
+	echo 'Leave this empty is cool!';
+	echo -n "pure-ftp group:";
+	read pure_ftp_group;
+	pure_ftp_group=${pure_ftp_group:=$pool_group};
+	echo "pure-ftp group: ${pure_ftp_group}";
+
+	# create pure-ftp db
+	${PureFTPDInstallPath}/bin/pure-pw useradd ${pure_ftp_user} -u ${pure_ftp_user} -g ${pure_ftp_group} -d ${ngx_root}/www -f ${PureFTPDDataPath}/pure-ftpd.passwd;
+	${PureFTPDInstallPath}/bin/pure-pw mkdb ${PureFTPDDataPath}/pure-ftpd.pdb -f ${PureFTPDDataPath}/pure-ftpd.passwd;
+
+	echo "create pure-ftp account success";
+fi;
+
+chown -R ${pool_user}:${pool_group} ${ngx_root};
+
+firewall-cmd --permanent --zone=public --add-port=${ngx_listen}/tcp;
+firewall-cmd --reload;
+
+
+# Create vhost info file
+cat > ${ngx_root}/README.md <<EOF
+# vhost information
+# created by vhost
+
+Global:
+create time         `date +%Y-%m-%d-%H-%M-%S`
+vhost id            ${id}
+vhost dir           ${ngx_root}
+vhost user          ${pool_user}
+vhost group         ${pool_group}
+
+Nginx:
+listen              ${ngx_listen}
+doamin              ${ngx_server_name}
+ssl support         ${ngx_ssl_support}
+conf                ${ngx_root}/${Nginx}/nginx.conf
+access log          ${ngx_root}/${Nginx}/access.log
+error log           ${ngx_root}/${Nginx}/error.log
+
+PHP-FPM:
+listen              ${pool_listen}
+conf                ${ngx_root}/${Php}/php-fpm.conf
+access log          ${ngx_root}/${Php}/access.log
+slow log            ${ngx_root}/${Php}/slow.log
+
+PURE-FTPD:
+support             ${pure_ftp}
+`${PureFTPDInstallPath}/bin/pure-pw show ${pure_ftp_user} -f ${PureFTPDDataPath}/pure-ftpd.passwd`
+EOF
+
+cat ${ngx_root}/README.md
+
+exit 0;

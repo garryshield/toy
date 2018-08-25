@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+# Name: const;
+# Desc: an auto web server installation tool;
+# Date: 2013-02-07 by garryshield;
+
+source ./const;
+source ./funs;
+
+echo "${Ssh} installation";
+echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
+read ;
+read ;
+
+# key
+ssh-keygen -t rsa;
+
+cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys;
+chmod 400 ~/.ssh/authorized_keys;
+
+# sshd_config
+/bin/cp ${HostSetUpCnfPath}/${Ssh}/sshd_config /etc/ssh/sshd_config && \
+    echo "/bin/cp ${HostSetUpCnfPath}/${Ssh}/sshd_config /etc/ssh/sshd_config";
+sed -i "s:@PORT@:${SshPort}:" /etc/ssh/sshd_config;
+
+# port
+firewall-cmd --permanent --zone=public --service=ssh --add-port=${SshPort}/tcp
+firewall-cmd --permanent --zone=public --service=ssh --remove-port=22/tcp
+firewall-cmd --reload
+
+# restart
+# systemctl restart sshd.service
+
+# done
+echo ;
+echo ;
+echo ================================================================================;
+echo "${Sshd} config SUCCESS";
+echo 'Configure Command:';
+echo '	Port '${SshPort};
+echo ================================================================================;
+echo ;
+echo ;
+
+exit 0;

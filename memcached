@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+
+# Name: const;
+# Desc: an auto web server installation tool;
+# Date: 2013-02-07 by garryshield;
+
+source ./const;
+source ./funs;
+
+echo "${Memcached} installation";
+echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
+read ;
+read ;
+
+
+# uninstall
+if [ -d ${MemcachedInstallPath} ]; then
+  systemctl stop ${Memcached}.service;
+  systemctl disable ${Memcached}.service;
+
+  firewall-cmd --permanent --zone=public --remove-port=${MemcachedPort}/tcp;
+  firewall-cmd --reload;
+
+  mv ${HostSitesPath}/${Memcached} ${HostSitesPath}/${Memcached}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+  mv ${MemcachedInstallPath} ${MemcachedInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+fi;
+
+# rm -rf ${MemcachedSrcPath};
+rm -rf ${MemcachedTarPath};
+
+# download
+mkdir -p ${MemcachedSrcPath};
+if [ ! -f ${MemcachedPackPath} ]; then
+  wget ${MemcachedUrlPath} -O ${MemcachedPackPath};
+fi;
+
+# const
+MemcachedEtcPath=${HostSitesPath}/${Memcached}/etc;
+mkdir -p ${MemcachedEtcPath};
+
+MemcachedLogPath=${HostSitesPath}/${Memcached}/log;
+mkdir -p ${MemcachedLogPath};
+
+MemcachedVarPath=${HostSitesPath}/${Memcached}/var;
+mkdir -p ${MemcachedVarPath};
+
+MemcachedDataPath=${HostSitesPath}/${Memcached}/data;
+mkdir -p ${MemcachedDataPath};
+
+MemcachedSysPath=${HostSitesPath}/${Memcached}/systemd;
+mkdir -p ${MemcachedSysPath};
+
+# user & group
+remove_user ${MemcachedUser};
+remove_group ${MemcachedGroup};
+groupadd ${MemcachedGroup};
+useradd -s /sbin/nologin -d /dev/null -M -g ${MemcachedUser} ${MemcachedGroup};
+
+# port
+firewall-cmd --permanent --zone=public --add-port=${MemcachedPort}/tcp;
+firewall-cmd --reload;
+
+# installation
+mkdir -p ${MemcachedTarPath};
+
+tar -zxvf ${MemcachedPackPath} -C ${MemcachedTarPath};
+cd ${MemcachedTarPath}/${Memcached};
+
+# configure
+./configure --help > ../configure;
+
+MemcachedConfigure="\
+	--prefix=${MemcachedInstallPath} \
+";
+
+echo ${MemcachedConfigure} > ../option;
+
+./configure ${MemcachedConfigure} 2> ../configure.err;
+
+make -j 8 2> ../make.err;
+make -j 8 install 2> ../install.err;
+
+# memcached
+echo ;
+echo ;
+echo "memcached";
+/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached ${MemcachedEtcPath}/memcached && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached ${MemcachedEtcPath}/memcached";
+
+sed -i "s:@USER@:${MemcachedUser}:" ${MemcachedEtcPath}/memcached;
+sed -i "s:@PORT@:${MemcachedPort}:" ${MemcachedEtcPath}/memcached;
+
+# memcached.server
+echo ;
+echo ;
+echo "memcached.server";
+/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached.service ${MemcachedSysPath}/${Memcached}.service && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached.server ${MemcachedSysPath}/${Memcached}.service";
+
+sed -i "s:@EnvironmentFile@:${MemcachedEtcPath}/memcached:" ${MemcachedSysPath}/${Memcached}.service;
+sed -i "s:@MEMCACHED@:${MemcachedInstallPath}/bin/memcached:" ${MemcachedSysPath}/${Memcached}.service;
+
+systemctl enable ${MemcachedSysPath}/${Memcached}.service;
+
+# memcached@.server
+echo ;
+echo ;
+echo "memcached@.server";
+/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached@.service ${MemcachedSysPath}/${Memcached}@.service && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached@.server ${MemcachedSysPath}/${Memcached}@.service";
+
+sed -i "s:@EnvironmentFile@:${MemcachedEtcPath}/memcached:" ${MemcachedSysPath}/${Memcached}@.service;
+sed -i "s:@MEMCACHED@:${MemcachedInstallPath}/bin/memcached:" ${MemcachedSysPath}/${Memcached}@.service;
+
+
+# done
+echo ;
+echo ;
+echo ================================================================================;
+echo "${Memcached} installation SUCCESS";
+echo "Configure Command:";
+for itm in ${MemcachedConfigure}; do
+	echo "	"$itm;
+done;
+echo "systemctl {start|stop|reload} ${Memcached}";
+echo ================================================================================;
+echo ;
+echo ;
+
+exit 0;

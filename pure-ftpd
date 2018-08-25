@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+
+# Name: const;
+# Desc: an auto web server installation tool;
+# Date: 2013-02-07 by garryshield;
+
+source ./const;
+source ./funs;
+
+echo "${PureFTPD} installation";
+echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
+read ;
+read ;
+
+
+# uninstall
+if [ -d ${PureFTPDInstallPath} ]; then
+  systemctl stop ${PureFTPD}.service;
+  systemctl disable ${PureFTPD}.service;
+
+  firewall-cmd --permanent --zone=public --remove-port=${PureFTPDPort}/tcp;
+  firewall-cmd --permanent --zone=public --remove-port=30000-50000/tcp;
+  firewall-cmd --reload;
+
+  mv ${HostSitesPath}/${PureFTPD} ${HostSitesPath}/${PureFTPD}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+  mv ${PureFTPDInstallPath} ${PureFTPDInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+fi;
+
+# rm -rf ${PureFTPDSrcPath};
+rm -rf ${PureFTPDTarPath};
+
+# download
+mkdir -p ${PureFTPDSrcPath};
+if [ ! -f ${PureFTPDPackPath} ]; then
+  wget ${PureFTPDUrlPath} -O ${PureFTPDPackPath};
+fi;
+
+# const
+PureFTPDEtcPath=${HostSitesPath}/${PureFTPD}/etc;
+mkdir -p ${PureFTPDEtcPath};
+
+PureFTPDLogPath=${HostSitesPath}/${PureFTPD}/log;
+mkdir -p ${PureFTPDLogPath};
+
+PureFTPDVarPath=${HostSitesPath}/${PureFTPD}/var;
+mkdir -p ${PureFTPDVarPath};
+
+PureFTPDDataPath=${HostSitesPath}/${PureFTPD}/data;
+mkdir -p ${PureFTPDDataPath};
+
+PureFTPDSysPath=${HostSitesPath}/${PureFTPD}/systemd;
+mkdir -p ${PureFTPDSysPath};
+
+# user & group
+remove_user ${PureFTPDUser};
+remove_group ${PureFTPDGroup};
+groupadd ${PureFTPDGroup};
+useradd -s /sbin/nologin -d /dev/null -M -g ${PureFTPDUser} ${PureFTPDGroup};
+
+# port
+firewall-cmd --permanent --zone=public --add-port=${PureFTPDPort}/tcp;
+firewall-cmd --permanent --zone=public --add-port=30000-50000/tcp;
+firewall-cmd --reload;
+
+# installation
+mkdir -p ${PureFTPDTarPath};
+
+tar -zxvf ${PureFTPDPackPath} -C ${PureFTPDTarPath};
+cd ${PureFTPDTarPath}/${PureFTPD};
+
+# TLS
+mkdir -p /etc/ssl/private;
+openssl dhparam -out ${PureFTPDDataPath}/pure-ftpd-dhparams.pem 2048;
+ln -s ${PureFTPDDataPath}/pure-ftpd-dhparams.pem /etc/ssl/private/pure-ftpd-dhparams.pem;
+
+openssl req -x509 -nodes -newkey rsa:2048 -sha256 -keyout ${PureFTPDDataPath}/pure-ftpd.pem -out ${PureFTPDDataPath}/pure-ftpd.pem;
+chmod 600 ${PureFTPDDataPath}/pure-ftpd.pem;
+
+# configure
+./configure --help > ../configure;
+
+PureFTPDConfigure="\
+  --prefix=${PureFTPDInstallPath} \
+  --sysconfdir=${PureFTPDEtcPath} \
+
+  --with-tls \
+  --with-certfile=${PureFTPDDataPath}/pure-ftpd.pem\
+
+  --with-everything \
+";
+
+echo ${PureFTPDConfigure} > ../option;
+
+./configure ${PureFTPDConfigure} 2> ../configure.err;
+
+make -j 8 2> ../make.err;
+make -j 8 install 2> ../install.err;
+
+# pure-pw
+${PureFTPDInstallPath}/bin/pure-pw useradd ${PureFTPDUser} -u ${PureFTPDUser} -g ${PureFTPDGroup} -d ${HostSitesPath}/${Nginx}/data/html/ -f ${PureFTPDDataPath}/pure-ftpd.passwd;
+${PureFTPDInstallPath}/bin/pure-pw mkdb ${PureFTPDDataPath}/pure-ftpd.pdb -f ${PureFTPDDataPath}/pure-ftpd.passwd;
+${PureFTPDInstallPath}/bin/pure-pw show ${PureFTPDUser} -f ${PureFTPDDataPath}/pure-ftpd.passwd;
+
+# pure-ftpd.conf
+echo ;
+echo ;
+echo "pure-ftpd.conf";
+/bin/cp ${HostSetUpCnfPath}/${PureFTPD}/pure-ftpd.conf ${PureFTPDEtcPath}/pure-ftpd.conf && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${PureFTPD}/pure-ftpd.conf ${PureFTPDEtcPath}/pure-ftpd.conf";
+
+sed -i "s:@prefix@:${PureFTPDInstallPath}:" ${PureFTPDEtcPath}/pure-ftpd.conf;
+sed -i "s:@sysconfdir@:${PureFTPDEtcPath}:" ${PureFTPDEtcPath}/pure-ftpd.conf;
+sed -i "s:@PIDFile@:${PureFTPDVarPath}/pure-ftpd.pid:" ${PureFTPDEtcPath}/pure-ftpd.conf;
+sed -i "s:@PureDB@:${PureFTPDDataPath}/pure-ftpd.pdb:" ${PureFTPDEtcPath}/pure-ftpd.conf;
+sed -i "s:@Bind@:${PureFTPDPort}:" ${PureFTPDEtcPath}/pure-ftpd.conf;
+sed -i "s:@AltLog@:${PureFTPDLogPath}/pure-ftpd.log:" ${PureFTPDEtcPath}/pure-ftpd.conf;
+sed -i "s:@CertFile@:${PureFTPDDataPath}/pure-ftpd.pem:" ${PureFTPDEtcPath}/pure-ftpd.conf;
+
+# pure-ftpd.conf
+echo ;
+echo ;
+echo "pure-ftpd.conf";
+/bin/cp ${HostSetUpCnfPath}/${PureFTPD}/pure-ftpd.service ${PureFTPDSysPath}/${PureFTPD}.service && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${PureFTPD}/pure-ftpd.service ${PureFTPDSysPath}/${PureFTPD}.service";
+
+sed -i "s:@PID_FILE@:${PureFTPDVarPath}/pure-ftpd.pid:" ${PureFTPDSysPath}/${PureFTPD}.service;
+sed -i "s:@CONF_FILE@:${PureFTPDEtcPath}/pure-ftpd.conf:" ${PureFTPDSysPath}/${PureFTPD}.service;
+sed -i "s:@PURE_FTPD@:${PureFTPDInstallPath}/sbin/pure-ftpd:" ${PureFTPDSysPath}/${PureFTPD}.service;
+
+systemctl enable ${PureFTPDSysPath}/${PureFTPD}.service;
+
+# done
+echo ;
+echo ;
+echo ================================================================================;
+echo "${PureFTPD} installation SUCCESS";
+echo "Configure Command:";
+for itm in ${PureFTPDConfigure}; do
+	echo "	"$itm;
+done;
+echo "systemctl {start|stop|reload} ${PureFTPD}";
+echo ;
+echo "pdb manager:";
+echo "pure-pw useradd username -u uid -g gid -d homedir -f passwdfile";
+echo "pure-pw mkdb pdbfile -f passwdfile";
+echo ================================================================================;
+echo ;
+echo ;
+
+exit 0;

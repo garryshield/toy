@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+
+# Name: const;
+# Desc: an auto web server installation tool;
+# Date: 2013-02-07 by garryshield;
+
+source ./const;
+source ./funs;
+
+echo "${Nginx} installation";
+echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
+read ;
+read ;
+
+# uninstall
+if [ -d ${NginxInstallPath} ]; then
+  systemctl stop ${Nginx}.service;
+  systemctl disable ${Nginx}.service;
+
+  firewall-cmd --permanent --zone=public --remove-port=${NginxPort}/tcp;
+  firewall-cmd --reload;
+
+  mv ${HostSitesPath}/${Nginx} ${HostSitesPath}/${Nginx}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+  mv ${NginxInstallPath} ${NginxInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+fi;
+
+# rm -rf ${NginxSrcPath};
+rm -rf ${NginxTarPath};
+
+# download
+mkdir -p ${NginxSrcPath};
+if [ ! -f ${NginxPackPath} ]; then
+  wget ${NginxUrlPath} -O ${NginxPackPath};
+  wget https://github.com/openresty/echo-nginx-module/archive/v0.61.tar.gz -O ${NginxSrcPath}/echo-nginx-module-0.61.tar.gz
+fi;
+
+# const
+NginxEtcPath=${HostSitesPath}/${Nginx}/etc;
+mkdir -p ${NginxEtcPath};
+
+NginxLogPath=${HostSitesPath}/${Nginx}/log;
+mkdir -p ${NginxLogPath};
+
+NginxVarPath=${HostSitesPath}/${Nginx}/var;
+mkdir -p ${NginxVarPath};
+
+NginxDataPath=${HostSitesPath}/${Nginx}/data;
+mkdir -p ${NginxDataPath}/html;
+
+NginxSysPath=${HostSitesPath}/${Nginx}/systemd;
+mkdir -p ${NginxSysPath};
+
+# user & group
+remove_user ${NginxUser};
+remove_group ${NginxGroup};
+groupadd ${NginxGroup};
+useradd -s /sbin/nologin -d /dev/null -M -g ${NginxUser} ${NginxGroup};
+
+# port
+firewall-cmd --permanent --zone=public --add-port=${NginxPort}/tcp;
+firewall-cmd --reload;
+
+# installation
+mkdir -p ${NginxTarPath};
+
+tar -zxvf ${NginxSrcPath}/echo-nginx-module-0.61.tar.gz -C ${NginxTarPath};
+
+tar -zxvf ${NginxPackPath} -C ${NginxTarPath};
+cd ${NginxTarPath}/${Nginx};
+
+# configure
+./configure --help > ../configure;
+
+NginxConfigure="\
+	--prefix=${NginxInstallPath} \
+	--sbin-path=${NginxInstallPath}/sbin/nginx \
+  --modules-path=${NginxInstallPath}/modules \
+	--conf-path=${NginxEtcPath}/nginx.conf \
+	--error-log-path=${NginxLogPath}/error.log \
+	--pid-path=${NginxVarPath}/nginx.pid \
+	--lock-path=${NginxVarPath}/nginx.lock \
+
+	--user=${NginxUser} \
+	--group=${NginxGroup} \
+
+  --with-select_module \
+  --with-poll_module \
+
+  --with-threads \
+
+  --with-file-aio \
+
+	--with-http_ssl_module \
+  --with-http_v2_module \
+	--with-http_realip_module \
+  --with-http_addition_module \
+  --with-http_xslt_module \
+  --with-http_xslt_module=dynamic \
+	--with-http_image_filter_module \
+  --with-http_image_filter_module=dynamic \
+
+  --with-http_geoip_module \
+  --with-http_geoip_module=dynamic \
+  --with-http_sub_module \
+  --with-http_dav_module \
+  --with-http_flv_module \
+  --with-http_mp4_module \
+  --with-http_gunzip_module \
+  --with-http_gzip_static_module \
+  --with-http_auth_request_module \
+  --with-http_random_index_module \
+  --with-http_secure_link_module \
+  --with-http_degradation_module \
+  --with-http_slice_module \
+  --with-http_stub_status_module \
+
+  --with-http_perl_module \
+  --with-http_perl_module=dynamic \
+
+	--http-log-path=${NginxLogPath}/access.log \
+  --http-client-body-temp-path=${NginxDataPath}/client_body_temp \
+  --http-proxy-temp-path=${NginxDataPath}/proxy_temp \
+  --http-fastcgi-temp-path=${NginxDataPath}/fastcgi_temp \
+  --http-uwsgi-temp-path=${NginxDataPath}/uwsgi_temp \
+  --http-scgi-temp-path=${NginxDataPath}/scgi_temp \
+
+  --with-mail \
+  --with-mail=dynamic \
+  --with-mail_ssl_module \
+
+  --with-stream \
+  --with-stream=dynamic \
+  --with-stream_ssl_module \
+  --with-stream_realip_module \
+  --with-stream_geoip_module \
+  --with-stream_geoip_module=dynamic \
+  --with-stream_ssl_preread_module \
+
+  --with-google_perftools_module \
+  --with-cpp_test_module \
+
+  --add-dynamic-module=${NginxTarPath}/echo-nginx-module-0.61 \
+
+  --with-compat \
+
+  --with-pcre \
+
+  --with-libatomic \
+
+  --with-debug \
+";
+
+echo ${NginxConfigure} > ../option;
+
+./configure ${NginxConfigure} 2> ../configure.err;
+
+make -j 8 2> ../make.err;
+make -j 8 install 2> ../install.err;
+
+/bin/cp ${NginxInstallPath}/html/* ${NginxDataPath}/html/;
+echo "<?php phpinfo(); ?>" > ${NginxDataPath}/html/phpinfo.php;
+
+# nginx.conf
+echo ;
+echo ;
+echo "nginx.conf";
+/bin/cp ${HostSetUpCnfPath}/${Nginx}/nginx.conf ${NginxEtcPath}/nginx.conf && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${Nginx}/nginx.conf ${NginxEtcPath}/nginx.conf";
+
+sed -i "s:@USER@:${NginxUser}:" ${NginxEtcPath}/nginx.conf;
+sed -i "s:@GROUP@:${NginxGroup}:" ${NginxEtcPath}/nginx.conf;
+sed -i "s:@ERROR_LOG_FILE@:${NginxLogPath}/error.log:" ${NginxEtcPath}/nginx.conf;
+sed -i "s:@PID_FILE@:${NginxVarPath}/nginx.pid:" ${NginxEtcPath}/nginx.conf;
+sed -i "s:@HTTP_LOG_FILE@:${NginxLogPath}/access.log:" ${NginxEtcPath}/nginx.conf;
+
+sed -i "s:@PORT@:${NginxPort}:" ${NginxEtcPath}/nginx.conf;
+sed -i "s:@ROOT@:${NginxDataPath}/html:" ${NginxEtcPath}/nginx.conf;
+
+sed -i "s:@HTDOCS@:${HostSitesWebPath}:" ${NginxEtcPath}/nginx.conf;
+sed -i "s:@NGINX@:${Nginx}:" ${NginxEtcPath}/nginx.conf;
+
+${NginxInstallPath}/sbin/nginx -t -c ${NginxEtcPath}/nginx.conf;
+
+# nginx.server
+echo ;
+echo ;
+echo "nginx.server";
+/bin/cp ${HostSetUpCnfPath}/${Nginx}/nginx.service ${NginxSysPath}/${Nginx}.service && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${Nginx}/nginx.server ${NginxSysPath}/${Nginx}.service";
+
+sed -i "s:@PID_FILE@:${NginxVarPath}/nginx.pid:" ${NginxSysPath}/${Nginx}.service;
+sed -i "s:@CONF_FILE@:${NginxEtcPath}/nginx.conf:" ${NginxSysPath}/${Nginx}.service;
+sed -i "s:@NGINX@:${NginxInstallPath}/sbin/nginx:" ${NginxSysPath}/${Nginx}.service;
+
+systemctl enable ${NginxSysPath}/${Nginx}.service;
+
+# done
+echo ;
+echo ;
+echo ================================================================================;
+echo "${Nginx} installation SUCCESS";
+echo "Configure Command:";
+for itm in ${NginxConfigure}; do
+	echo "	"$itm;
+done;
+echo "systemctl {start|stop|reload} ${Nginx}";
+echo ================================================================================;
+echo ;
+echo ;
+
+exit 0;

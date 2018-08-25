@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+
+# Name: const;
+# Desc: an auto web server installation tool;
+# Date: 2013-02-07 by garryshield;
+
+clear;
+
+# Check if user is root
+if [ $(id -u) != "0" ]; then
+	echo "Error: You must be root to run this script.";
+	exit 1;
+fi;
+
+TOY="toy-1.0.0"
+
+# Header prompt
+echo "================================================================================";
+echo "${TOY}";
+echo "auto web server installation tool";
+echo "order: init ssh mysql nginx php pure-ftpd redis memcached node python nginx-vhost";
+echo "================================================================================";
+
+# Constant
+HostSetUpPath=$(pwd);
+HostSetUpSrcPath=${HostSetUpPath}/src;
+HostSetUpTmpPath=${HostSetUpPath}/tmp;
+HostSetUpCnfPath=${HostSetUpPath}/cnf;
+
+HostSetUpSoftPath=/usr/local;
+
+HostSitesPath=/var/sites;
+HostSitesToolsPath=${HostSitesPath}/tool;
+HostSitesEtcPath=${HostSitesPath}/etc;
+HostSitesLogPath=${HostSitesPath}/log;
+HostSitesVarPath=${HostSitesPath}/var;
+HostSitesDataPath=${HostSitesPath}/data;
+HostSitesWebPath=${HostSitesPath}/htdocs;
+
+####################
+# Ssh
+Ssh=ssh;
+SshPort=2316;
+
+####################
+# Nginx
+Nginx=nginx-1.14.0;
+NginxName=nginx-1.14.0.tar.gz;
+NginxPort=2317;
+NginxUser=nginx;
+NginxGroup=nginx;
+NginxUrlPath=http://nginx.org/download/${NginxName};
+NginxSrcPath=${HostSetUpSrcPath}/${Nginx}
+NginxTarPath=${HostSetUpTmpPath}/${Nginx};
+NginxPackPath=${HostSetUpSrcPath}/${Nginx}/${NginxName};
+NginxInstallPath=${HostSetUpSoftPath}/${Nginx};
+
+
+####################
+# NodeJS
+NodeJS=NodeJS;
+
+
+####################
+# MariaDB
+MariaDB=mariadb-10.3.8;
+MariaDBName=mariadb-10.3.8.tar.gz;
+MariaDBPort=2318;
+MariaDBUser=mariadb;
+MariaDBGroup=mariadb;
+MariaDBUrlPath=http://downloads.mariadb.com/MariaDB/${MariaDB}/source/${MariaDBName};
+MariaDBSrcPath=${HostSetUpSrcPath}/${MariaDB}
+MariaDBTarPath=${HostSetUpTmpPath}/${MariaDB};
+MariaDBPackPath=${HostSetUpSrcPath}/${MariaDB}/${MariaDBName};
+MariaDBInstallPath=${HostSetUpSoftPath}/${MariaDB};
+
+
+####################
+# Php
+Php=php-7.2.8;
+PhpName=php-7.2.8.tar.gz;
+PhpUser=php;
+PhpGroup=php;
+PhpUrlPath=http://www.php.net/distributions/${PhpName};
+PhpSrcPath=${HostSetUpSrcPath}/${Php}
+PhpTarPath=${HostSetUpTmpPath}/${Php};
+PhpPackPath=${HostSetUpSrcPath}/${Php}/${PhpName};
+PhpInstallPath=${HostSetUpSoftPath}/${Php};
+
+
+####################
+# Pure-FTPd
+PureFTPD=pure-ftpd-1.0.47;
+PureFTPDName=pure-ftpd-1.0.47.tar.gz;
+PureFTPDPort=2319;
+PureFTPDUser=pureftpd;
+PureFTPDGroup=pureftpd;
+PureFTPDUrlPath=https://download.pureftpd.org/pub/pure-ftpd/releases/${PureFTPDName};
+PureFTPDSrcPath=${HostSetUpSrcPath}/${PureFTPD}
+PureFTPDTarPath=${HostSetUpTmpPath}/${PureFTPD};
+PureFTPDPackPath=${HostSetUpSrcPath}/${PureFTPD}/${PureFTPDName};
+PureFTPDInstallPath=${HostSetUpSoftPath}/${PureFTPD};
+
+
+####################
+# Memcached
+Memcached=memcached-1.5.9;
+MemcachedName=memcached-1.5.9.tar.gz;
+MemcachedPort=2320;
+MemcachedUser=memcached;
+MemcachedGroup=memcached;
+MemcachedUrlPath=http://www.memcached.org/files/${MemcachedName};
+MemcachedSrcPath=${HostSetUpSrcPath}/${Memcached}
+MemcachedTarPath=${HostSetUpTmpPath}/${Memcached};
+MemcachedPackPath=${HostSetUpSrcPath}/${Memcached}/${MemcachedName};
+MemcachedInstallPath=${HostSetUpSoftPath}/${Memcached};
+
+
+####################
+# Redis
+Redis=redis-4.0.11;
+RedisName=redis-4.0.11.tar.gz;
+RedisPort=2321;
+RedisUser=redis;
+RedisGroup=redis;
+RedisUrlPath=https://github.com/antirez/redis/archive/4.0.11.tar.gz;
+RedisSrcPath=${HostSetUpSrcPath}/${Redis}
+RedisTarPath=${HostSetUpTmpPath}/${Redis};
+RedisPackPath=${HostSetUpSrcPath}/${Redis}/${RedisName};
+RedisInstallPath=${HostSetUpSoftPath}/${Redis};

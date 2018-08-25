@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+
+# Name: const;
+# Desc: an auto web server installation tool;
+# Date: 2013-02-07 by garryshield;
+
+source ./const;
+source ./funs;
+
+echo "${Redis} installation";
+echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
+read ;
+read ;
+
+
+# uninstall
+if [ -d ${RedisInstallPath} ]; then
+  systemctl stop ${Redis}.service;
+  systemctl disable ${Redis}.service;
+
+  firewall-cmd --permanent --zone=public --remove-port=${RedisPort}/tcp;
+  firewall-cmd --reload;
+
+  mv ${HostSitesPath}/${Redis} ${HostSitesPath}/${Redis}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+  mv ${RedisInstallPath} ${RedisInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`;
+fi;
+
+# rm -rf ${RedisSrcPath};
+rm -rf ${RedisTarPath};
+
+# download
+mkdir -p ${RedisSrcPath};
+if [ ! -f ${RedisPackPath} ]; then
+  wget ${RedisUrlPath} -O ${RedisPackPath};
+fi;
+
+# const
+RedisEtcPath=${HostSitesPath}/${Redis}/etc;
+mkdir -p ${RedisEtcPath};
+
+RedisLogPath=${HostSitesPath}/${Redis}/log;
+mkdir -p ${RedisLogPath};
+
+RedisVarPath=${HostSitesPath}/${Redis}/var;
+mkdir -p ${RedisVarPath};
+
+RedisDataPath=${HostSitesPath}/${Redis}/data;
+mkdir -p ${RedisDataPath};
+
+RedisSysPath=${HostSitesPath}/${Redis}/systemd;
+mkdir -p ${RedisSysPath};
+
+# user & group
+remove_user ${RedisUser};
+remove_group ${RedisGroup};
+groupadd ${RedisGroup};
+useradd -s /sbin/nologin -d /dev/null -M -g ${RedisUser} ${RedisGroup};
+
+# port
+firewall-cmd --permanent --zone=public --add-port=${RedisPort}/tcp;
+firewall-cmd --reload;
+
+# installation
+mkdir -p ${RedisTarPath};
+
+tar -zxvf ${RedisPackPath} -C ${RedisTarPath};
+cd ${RedisTarPath}/${Redis};
+
+make -j 8 PREFIX=${RedisInstallPath} install 2> ../install.err;
+
+# redis.conf
+echo ;
+echo ;
+echo "redis.conf";
+/bin/cp ${HostSetUpCnfPath}/${Redis}/redis.conf ${RedisEtcPath}/redis.conf && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${Redis}/redis.conf ${RedisEtcPath}/redis.conf";
+
+sed -i "s:@PORT@:${RedisPort}:" ${RedisEtcPath}/redis.conf;
+sed -i "s:@PID_FILE@:${RedisVarPath}/redis.pid:" ${RedisEtcPath}/redis.conf;
+sed -i "s:@LOG_FILE@:${RedisLogPath}/redis.log:" ${RedisEtcPath}/redis.conf;
+sed -i "s:@DIR@:${RedisDataPath}:" ${RedisEtcPath}/redis.conf;
+
+# redis.server
+echo ;
+echo ;
+echo "redis.server";
+/bin/cp ${HostSetUpCnfPath}/${Redis}/redis.service ${RedisSysPath}/${Redis}.service && \
+  echo "/bin/cp ${HostSetUpCnfPath}/${Redis}/redis.server ${RedisSysPath}/${Redis}.service";
+
+sed -i "s:@USER@:${RedisUser}:" ${RedisSysPath}/${Redis}.service;
+sed -i "s:@GROUP@:${RedisGroup}:" ${RedisSysPath}/${Redis}.service;
+sed -i "s:@PID_FILE@:${RedisVarPath}/redis.pid:" ${RedisSysPath}/${Redis}.service;
+sed -i "s:@REDIS_SERVER@:${RedisInstallPath}/bin/redis-server:" ${RedisSysPath}/${Redis}.service;
+sed -i "s:@REDIS_CONF@:${RedisEtcPath}/redis.conf:" ${RedisSysPath}/${Redis}.service;
+
+systemctl enable ${RedisSysPath}/${Redis}.service;
+
+chown -R ${RedisUser}:${RedisGroup} ${HostSitesPath}/${Redis};
+
+# done
+echo ;
+echo ;
+echo ================================================================================;
+echo "${Redis} installation SUCCESS";
+echo "Configure Command:";
+for itm in ${RedisConfigure}; do
+	echo "	"$itm;
+done;
+echo "systemctl {start|stop|reload} ${Redis}";
+echo ================================================================================;
+echo ;
+echo ;
+
+exit 0;

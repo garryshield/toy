@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+# Name: const;
+# Desc: an auto web server installation tool;
+# Date: 2013-02-07 by garryshield;
+
+source ./const;
+source ./funs;
+
+echo "${NodeJS} installation";
+echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
+read ;
+read ;
+
+wget -qO- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | bash;
+
+. ~/.bash_profile;
+
+nvm install node --latest-npm;
+nvm install --lts --latest-npm;
+
+nvm ls;
+
+# done
+echo ;
+echo ;
+echo ================================================================================;
+echo "${NodeJs} config SUCCESS";
+echo ================================================================================;
+echo ;
+echo ;
+
+exit 0;
