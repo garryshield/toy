@@ -9,6 +9,7 @@ chmod +x ./*
 ```
 
 # 源码结构
+```
 .
 ├── README.md
 ├── cnf # 配置文件模板
@@ -32,28 +33,33 @@ chmod +x ./*
 ├── redis # Redis 安装脚本
 ├── ssh # SSH 初始化脚本
 └── vhost # Nginx 虚拟主机脚本
+```
 
-Version              | Port
--                    | -
-ssh                  | 2316
-nginx-1.14.0         | 2317
-mariadb-10.3.8       | 2318
-pure-ftpd-1.0.47     | 2319
-memcached-1.5.9      | 2320
-redis-4.0.11         | 2321
-php-7.2.8            | <none>     
+| Version              | Port       |
+| -                    | -          |
+| ssh                  | 2316       |
+| nginx-1.14.0         | 2317       |
+| mariadb-10.3.8       | 2318       |
+| pure-ftpd-1.0.47     | 2319       |
+| memcached-1.5.9      | 2320       |
+| redis-4.0.11         | 2321       |
 
-程序安装目录
+程序安装目录：
+```
 /usr/local/<包名>
+```
 
 配置安装目录：
+```
 /var/sites/<包名>
+```
 
 虚拟主机目录：
+```
 /vat/sites/htdocs/<SITE ID>
 /vat/sites/htdocs/<SITE ID>/nginx-1.14.0 # 虚拟主机 nginx 配置
 /vat/sites/htdocs/<SITE ID>/php-7.2.8 # 虚拟主机 php-fpm 配置
 /vat/sites/htdocs/<SITE ID>/www # 虚拟主机根目录
-
+```
 
 
