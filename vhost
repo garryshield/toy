@@ -123,7 +123,7 @@ sed -i "s#@fastcgi_pass@#${pool_listen}#" ${ngx_root}/${Nginx}/nginx.conf;
 # php-fpm.conf
 echo ;
 echo ;
-echo "php-fpm.conf";
+echo "php-fpm.conf (${Php})";
 /bin/cp ${HostSetUpCnfPath}/vhost/php-fpm.conf ${ngx_root}/${Php}/php-fpm.conf && \
   echo "/bin/cp ${HostSetUpCnfPath}/vhost/php-fpm.conf ${ngx_root}/${Php}/php-fpm.conf";
 
@@ -133,6 +133,38 @@ sed -i "s:@pool_group@:${pool_group}:" ${ngx_root}/${Php}/php-fpm.conf;
 sed -i "s#@pool_listen@#${pool_listen}#" ${ngx_root}/${Php}/php-fpm.conf;
 sed -i "s:@pool_access_log@:${ngx_root}/${Php}/access.log:" ${ngx_root}/${Php}/php-fpm.conf;
 sed -i "s:@pool_slow_log@:${ngx_root}/${Php}/slow.log:" ${ngx_root}/${Php}/php-fpm.conf;
+
+# php-5.6.40
+# php-fpm.conf
+Php5_6_40=php-5.6.40;
+echo ;
+echo ;
+echo "php-fpm.conf (${Php5_6_40})";
+/bin/cp ${HostSetUpCnfPath}/vhost/php-fpm-5.6.40.conf ${ngx_root}/${Php5_6_40}/php-fpm.conf && \
+  echo "/bin/cp ${HostSetUpCnfPath}/vhost/php-fpm.conf ${ngx_root}/${Php5_6_40}/php-fpm.conf";
+
+sed -i "s:@pool_name@:${pool_name}:" ${ngx_root}/${Php5_6_40}/php-fpm.conf;
+sed -i "s:@pool_user@:${pool_user}:" ${ngx_root}/${Php5_6_40}/php-fpm.conf;
+sed -i "s:@pool_group@:${pool_group}:" ${ngx_root}/${Php5_6_40}/php-fpm.conf;
+sed -i "s#@pool_listen@#${pool_listen}#" ${ngx_root}/${Php5_6_40}/php-fpm.conf;
+sed -i "s:@pool_access_log@:${ngx_root}/${Php5_6_40}/access.log:" ${ngx_root}/${Php5_6_40}/php-fpm.conf;
+sed -i "s:@pool_slow_log@:${ngx_root}/${Php5_6_40}/slow.log:" ${ngx_root}/${Php5_6_40}/php-fpm.conf;
+
+# php-5.4.45
+# php-fpm.conf
+Php5_4_45=php-5.4.45;
+echo ;
+echo ;
+echo "php-fpm.conf (${Php5_4_45})";
+/bin/cp ${HostSetUpCnfPath}/vhost/php-fpm-5.4.45.conf ${ngx_root}/${Php5_4_45}/php-fpm.conf && \
+  echo "/bin/cp ${HostSetUpCnfPath}/vhost/php-fpm.conf ${ngx_root}/${Php5_4_45}/php-fpm.conf";
+
+sed -i "s:@pool_name@:${pool_name}:" ${ngx_root}/${Php5_4_45}/php-fpm.conf;
+sed -i "s:@pool_user@:${pool_user}:" ${ngx_root}/${Php5_4_45}/php-fpm.conf;
+sed -i "s:@pool_group@:${pool_group}:" ${ngx_root}/${Php5_4_45}/php-fpm.conf;
+sed -i "s#@pool_listen@#${pool_listen}#" ${ngx_root}/${Php5_4_45}/php-fpm.conf;
+sed -i "s:@pool_access_log@:${ngx_root}/${Php5_4_45}/access.log:" ${ngx_root}/${Php5_4_45}/php-fpm.conf;
+sed -i "s:@pool_slow_log@:${ngx_root}/${Php5_4_45}/slow.log:" ${ngx_root}/${Php5_4_45}/php-fpm.conf;
 
 # pure-ftp
 PureFTPDDataPath=${HostSitesPath}/${PureFTPD}/data;
@@ -191,11 +223,23 @@ conf                ${ngx_root}/${Nginx}/nginx.conf
 access log          ${ngx_root}/${Nginx}/access.log
 error log           ${ngx_root}/${Nginx}/error.log
 
-PHP-FPM:
+PHP-FPM (${Php}):
 listen              ${pool_listen}
 conf                ${ngx_root}/${Php}/php-fpm.conf
 access log          ${ngx_root}/${Php}/access.log
 slow log            ${ngx_root}/${Php}/slow.log
+
+PHP-FPM (${Php5_6_40}):
+listen              ${pool_listen}
+conf                ${ngx_root}/${Php5_6_40}/php-fpm.conf
+access log          ${ngx_root}/${Php5_6_40}/access.log
+slow log            ${ngx_root}/${Php5_6_40}/slow.log
+
+PHP-FPM (${Php5_4_45}):
+listen              ${pool_listen}
+conf                ${ngx_root}/${Php5_4_45}/php-fpm.conf
+access log          ${ngx_root}/${Php5_4_45}/access.log
+slow log            ${ngx_root}/${Php5_4_45}/slow.log
 
 PURE-FTPD:
 support             ${pure_ftp}
