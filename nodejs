@@ -1,33 +1,43 @@
 #!/usr/bin/env bash
 
-# Name: const;
-# Desc: an auto web server installation tool;
-# Date: 2013-02-07 by garryshield;
+# Name: nodejs
+# Desc: an auto web server installation tool
+# Date: 2013-02-07 by garryshield
 
-source ./const;
-source ./funs;
+source ./const
 
-echo "${NodeJS} installation";
-echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
-read ;
-read ;
+# NVM
+NVM=NVM
+NVM_URL=https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh
 
-wget -qO- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | bash;
+echo "${NVM} installation"
+echo "pleace input <Enter> twice to continue or <CTRL+C> to exit:"
+read
+read
 
-. ~/.bash_profile;
+wget -qO- ${NVM_URL} | bash
 
-nvm install node --latest-npm;
-nvm install --lts --latest-npm;
+echo
+echo
 
-nvm ls;
+. ~/.bash_profile
+
+nvm install node --latest-npm
+
+echo
+echo
+
+nvm install --lts --latest-npm
+
+nvm ls
 
 # done
-echo ;
-echo ;
-echo ================================================================================;
-echo "${NodeJs} config SUCCESS";
-echo ================================================================================;
-echo ;
-echo ;
+echo
+echo
+echo ================================================================================
+echo "${NVM} config SUCCESS"
+echo ================================================================================
+echo
+echo
 
-exit 0;
+exit 0

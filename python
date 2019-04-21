@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+# Name: python
+# Desc: an auto web server installation tool
+# Date: 2013-02-07 by garryshield
+
+source ./const
+
+# https://github.com/pyenv/pyenv
+PYENV=pyenv
+PYENV_URL=https://github.com/pyenv/pyenv.git
+PYENV_ROOT=~/.pyenv
+PYENV_PROFILE=~/.bashrc
+
+echo "${PYENV} installation"
+echo "pleace input <Enter> twice to continue or <CTRL+C> to exit:"
+read
+read
+
+if [ -d ${PYENV_ROOT} ]; then
+  cd ${PYENV_ROOT}
+  git pull
+else
+  git clone ${PYENV_URL} ${PYENV_ROOT}
+fi
+
+if ! command grep -qc 'PYENV_ROOT' "${PYENV_PROFILE}"; then
+  echo '' >> ${PYENV_PROFILE}
+  echo '# pyenv' >> ${PYENV_PROFILE}
+  echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ${PYENV_PROFILE}
+  echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ${PYENV_PROFILE}
+
+  echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init -)"\nfi' >> ${PYENV_PROFILE}
+fi
+
+. ~/.bash_profile
+
+pyenv install -v 2.7.10
+pyenv install -v 3.7.0
+pyenv rehash
+pyenv versions
+
+# pipenv
+# https://github.com/pypa/pipenv
+pyenv shell 2.7.10
+pip install --upgrade pip
+pip install pipenv 
+
+pyenv shell 3.7.0
+pip install --upgrade pip
+pip install pipenv
+
+# done
+echo
+echo
+echo ================================================================================
+echo "${PYENV} config SUCCESS"
+echo ================================================================================
+echo
+echo
+
+exit 0

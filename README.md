@@ -87,3 +87,51 @@ systemctl [status|start|stop|restart] <包名>
 ```
 scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 ```
+
+# php 结构
+/var/sites/<PHP_VERSION>
+e.g. PHP_VERSION = php-5.4.45
+```
+tree /var/sites/php-5.4.45
+.
+├── data
+├── etc
+│   ├── env
+│   ├── group   # pool 组，通过 systemctl {start|stop|reload|status} php-5.4.45@group 管理
+│   │   ├── env   # 组环境变量用于 php-5.4.45@.service 中的 EnvironmentFile
+│   │   ├── php-fpm.conf
+│   │   ├── php-fpm.d
+│   │   │   └── www.conf  # pool 配置文件
+│   │   └── php.ini.d
+│   │       └── www.ini   # 当前组下所有 pool 共用的 php.ini 配置，若具体的 pool 需要单独的配置,可在 <pool.conf> 中修改
+                          # 通过组下的 env 文件中的 PHP_INI_SCAN_DIR 找到
+                          # 注：php-5.4.45 版本中 PHP_INI_SCAN_DIR 不支持追加和指定多个查找目录
+│   ├── php-fpm.conf
+│   ├── php-fpm.d
+│   │   └── www.conf
+│   ├── php.ini -> /var/sites/php-5.4.45/etc/php.ini-development
+│   ├── php.ini.d
+│   │   └── www.ini
+│   ├── php.ini-development
+│   └── php.ini-production
+├── log
+│   ├── group.log   # group 组的 php-fpm 日志
+│   ├── group.www.access.log    # group 组中 www pool 的 access 日志
+│   ├── group.www.error.log
+│   ├── group.www.slow.log
+│   ├── php-fpm.log
+│   ├── php-fpm.www.access.log
+│   ├── php-fpm.www.error.log
+│   └── php-fpm.www.slow.log
+├── systemd
+│   ├── php-5.4.45.service
+│   └── php-5.4.45@.service   # systemd unit template 用来管理组
+└── var
+    ├── group.pid
+    ├── group.www.socket    # group 组中 www pool 的 socket
+    ├── php-fpm.pid
+    └── php-fpm.www.socket
+```
+
+TODO:
+1 把组名从 pool 配置文件中的提取到 ExecStartPre

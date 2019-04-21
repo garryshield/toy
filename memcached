@@ -1,130 +1,298 @@
 #!/usr/bin/env bash
 
-# Name: const;
-# Desc: an auto web server installation tool;
-# Date: 2013-02-07 by garryshield;
+# Name: memcached
+# Desc: an auto web server installation tool
+# Date: 2013-02-07 by garryshield
 
-source ./const;
-source ./funs;
+source ./const
 
-echo "${Memcached} installation";
-echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
-read ;
-read ;
+help() {
+    echo "Usage: $0 {install|group|server|help} [option...]" >&2
+    echo
+    echo "    install <version>"
+    echo "    group -v=<version> -p=<prefix>"
+    echo "    server -v=<version> -p=<prefix> -P=<port> -u=<user> -g=<group>"
+    echo
+    # echo some stuff here for the -a or --add-options 
+    exit 1
+}
 
+# memcached install <version>
+# <version> e.g. 1.5.12
+# memcached install 1.5.12
+install() {
+  if [ "$#" -ne 1 ]; then
+    help
+    exit 1
+  fi
 
-# uninstall
-if [ -d ${MemcachedInstallPath} ]; then
-  systemctl stop ${Memcached}.service;
-  systemctl disable ${Memcached}.service;
+  local Memcached=memcached-$1
+  local MemcachedPackName=memcached-$1.tar.gz
+  local MemcachedUrlPath=http://www.memcached.org/files/${MemcachedPackName}
+  # local MemcachedUrlPath=http://192.168.113.1:8080/${MemcachedPackName}
+  local MemcachedSrcPath=${ToySrcPath}/${Memcached}
+  local MemcachedTarPath=${ToyTmpPath}/${Memcached}
+  local MemcachedPackPath=${ToySrcPath}/${Memcached}/${MemcachedPackName}
+  local MemcachedInstallPath=${ToySoftPath}/${Memcached}
 
-  firewall-cmd --permanent --zone=public --remove-port=${MemcachedPort}/tcp;
-  firewall-cmd --reload;
+  echo "${Memcached} installation"
+  echo "pleace input <Enter> twice to continue or <CTRL+C> to exit:"
+  read
+  read
 
-  mv ${HostSitesPath}/${Memcached} ${HostSitesPath}/${Memcached}-`date '+%Y-%m-%d(%H:%M:%S)'`;
-  mv ${MemcachedInstallPath} ${MemcachedInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`;
-fi;
+  # backup
+  if [ -d "${MemcachedInstallPath}" ]; then
+    mv ${MemcachedInstallPath} ${MemcachedInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`
+  fi
 
-# rm -rf ${MemcachedSrcPath};
-rm -rf ${MemcachedTarPath};
+  rm -rf ${MemcachedSrcPath}
+  rm -rf ${MemcachedTarPath}
 
-# download
-mkdir -p ${MemcachedSrcPath};
-if [ ! -f ${MemcachedPackPath} ]; then
-  wget ${MemcachedUrlPath} -O ${MemcachedPackPath};
-fi;
+  mkdir -p ${MemcachedSrcPath}
+  mkdir -p ${MemcachedTarPath}
 
-# const
-MemcachedEtcPath=${HostSitesPath}/${Memcached}/etc;
-mkdir -p ${MemcachedEtcPath};
+  wget ${MemcachedUrlPath} -O ${MemcachedPackPath}
 
-MemcachedLogPath=${HostSitesPath}/${Memcached}/log;
-mkdir -p ${MemcachedLogPath};
+  local retVal=$?
+  if [ "${retVal}" -ne 0 ]; then
+      exit ${retVal}
+  fi
 
-MemcachedVarPath=${HostSitesPath}/${Memcached}/var;
-mkdir -p ${MemcachedVarPath};
+  tar -zxvf ${MemcachedPackPath} -C ${MemcachedTarPath}
+  cd ${MemcachedTarPath}/${Memcached}
 
-MemcachedDataPath=${HostSitesPath}/${Memcached}/data;
-mkdir -p ${MemcachedDataPath};
+  # configure
+  ./configure --help > ../configure
 
-MemcachedSysPath=${HostSitesPath}/${Memcached}/systemd;
-mkdir -p ${MemcachedSysPath};
+  local MemcachedConfigure=(
+    --prefix=${MemcachedInstallPath}
+  )
 
-# user & group
-remove_user ${MemcachedUser};
-remove_group ${MemcachedGroup};
-groupadd ${MemcachedGroup};
-useradd -s /sbin/nologin -d /dev/null -M -g ${MemcachedUser} ${MemcachedGroup};
+  for item in ${MemcachedConfigure[@]}; do
+    echo ${item} >> ../option
+  done
 
-# port
-firewall-cmd --permanent --zone=public --add-port=${MemcachedPort}/tcp;
-firewall-cmd --reload;
+  ./configure ${MemcachedConfigure[@]} 2> ../configure.err
 
-# installation
-mkdir -p ${MemcachedTarPath};
+  make -j 8 2> ../make.err
+  make -j 8 install 2> ../install.err
 
-tar -zxvf ${MemcachedPackPath} -C ${MemcachedTarPath};
-cd ${MemcachedTarPath}/${Memcached};
+  # done
+  echo
+  echo
+  echo ================================================================================
+  echo "${Memcached} installation SUCCESS"
+  echo "Configure:"
+  for item in ${MemcachedConfigure[@]}; do
+    echo "    ${item}"
+  done
+  echo ================================================================================
+  echo
+  echo
 
-# configure
-./configure --help > ../configure;
+  exit 0
+}
 
-MemcachedConfigure="\
-	--prefix=${MemcachedInstallPath} \
-";
+# memcached group 
+# -v, --version
+# -p, --prefix
+# memcached group -v=1.5.12 -p=/var/sites/www_test_com
+# memcached group -v=1.5.12 -p=/var/sites/www_test_com
+group(){
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      *)
 
-echo ${MemcachedConfigure} > ../option;
+      ;;
+  esac
+  done
 
-./configure ${MemcachedConfigure} 2> ../configure.err;
+  if [ -z "$Version" ] || [ -z "$Prefix" ]; then
+    help
+    exit 1
+  fi
 
-make -j 8 2> ../make.err;
-make -j 8 install 2> ../install.err;
+  local Memcached=memcached-$Version
+  local MemcachedInstallPath=${ToySoftPath}/${Memcached}
 
-# memcached
-echo ;
-echo ;
-echo "memcached";
-/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached ${MemcachedEtcPath}/memcached && \
-  echo "/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached ${MemcachedEtcPath}/memcached";
+  if [ ! -d "${MemcachedInstallPath}" ]; then
+    echo "${Memcached} is not installed yet"
+    exit 1
+  fi
 
-sed -i "s:@USER@:${MemcachedUser}:" ${MemcachedEtcPath}/memcached;
-sed -i "s:@PORT@:${MemcachedPort}:" ${MemcachedEtcPath}/memcached;
+  local NodePath=${Prefix}/${Memcached}
 
-# memcached.server
-echo ;
-echo ;
-echo "memcached.server";
-/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached.service ${MemcachedSysPath}/${Memcached}.service && \
-  echo "/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached.server ${MemcachedSysPath}/${Memcached}.service";
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
 
-sed -i "s:@EnvironmentFile@:${MemcachedEtcPath}/memcached:" ${MemcachedSysPath}/${Memcached}.service;
-sed -i "s:@MEMCACHED@:${MemcachedInstallPath}/bin/memcached:" ${MemcachedSysPath}/${Memcached}.service;
+  mkdir -p ${NodeData}
+  mkdir -p ${NodeEtc}
+  mkdir -p ${NodeVar}
+  mkdir -p ${NodeLog}
+  mkdir -p ${NodeSystemd}
 
-systemctl enable ${MemcachedSysPath}/${Memcached}.service;
+  echo
+  return 0
+}
 
-# memcached@.server
-echo ;
-echo ;
-echo "memcached@.server";
-/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached@.service ${MemcachedSysPath}/${Memcached}@.service && \
-  echo "/bin/cp ${HostSetUpCnfPath}/${Memcached}/memcached@.server ${MemcachedSysPath}/${Memcached}@.service";
+# memcached server 
+# -v, --version
+# -p, --prefix
+# -P, --port
+# -u, --user
+# -g, --group
+# memcached server -v=1.5.12 -p=/var/sites/www_test_com -P=11211 -u=memcached-1.5.12 -g=www
+# memcached server -v=1.5.12 -p=/var/sites/www_test_com -P=11212 -u=memcached-1.5.12 -g=www
+server(){
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      -P=*|--port=*)
+      local Port="${i#*=}"
+      shift
+      ;;
+      -u=*|--user=*)
+      local User="${i#*=}"
+      shift
+      ;;
+      -g=*|--group=*)
+      local Group="${i#*=}"
+      shift
+      ;;
+      *)
 
-sed -i "s:@EnvironmentFile@:${MemcachedEtcPath}/memcached:" ${MemcachedSysPath}/${Memcached}@.service;
-sed -i "s:@MEMCACHED@:${MemcachedInstallPath}/bin/memcached:" ${MemcachedSysPath}/${Memcached}@.service;
+      ;;
+  esac
+  done
 
+  if [ -z "$Version" ] || [ -z "$Prefix" ] || [ -z "$Port" ]; then
+    help
+    exit 1
+  fi
 
-# done
-echo ;
-echo ;
-echo ================================================================================;
-echo "${Memcached} installation SUCCESS";
-echo "Configure Command:";
-for itm in ${MemcachedConfigure}; do
-	echo "	"$itm;
-done;
-echo "systemctl {start|stop|reload} ${Memcached}";
-echo ================================================================================;
-echo ;
-echo ;
+  local Memcached=memcached-$Version
+  local MemcachedInstallPath=${ToySoftPath}/${Memcached}
 
-exit 0;
+  local User=${User:-${Memcached}}
+  local Group=${Group:-www}
+
+  if [ ! -d "${MemcachedInstallPath}" ]; then
+    echo "${Memcached} is not installed yet"
+    exit 1
+  fi
+
+  local NodePath=${Prefix}/${Memcached}
+
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
+
+  local ServerDataPath=${NodeData}/${Port}
+  local ServerEtcPath=${NodeEtc}/${Port}
+  local ServerVarPath=${NodeVar}/${Port}
+  local ServerLogPath=${NodeLog}/${Port}
+
+  local ServerEtc=${ServerEtcPath}/memcached
+
+  if [ -f "${ServerEtc}" ]; then
+    echo "${ServerEtc} already exists"
+    exit 1
+  fi
+
+  mkdir -p ${ServerDataPath}
+  mkdir -p ${ServerEtcPath}
+  mkdir -p ${ServerVarPath}
+  mkdir -p ${ServerLogPath}
+
+  local UUID=$(echo -n ${ServerEtc} | openssl md5 | awk '{print $2}')
+
+  # memcached
+  echo
+  echo
+  echo "memcached"
+  /bin/cp -v ${ToyCnfPath}/${Memcached}/memcached ${ServerEtc}
+
+  sed -i "/@USER@/{
+    s::${User}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/@PORT@/{
+    s::${Port}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+
+  # memcached@.server
+  echo
+  echo
+  echo "memcached@.server"
+  /bin/cp -v ${ToyCnfPath}/${Memcached}/memcached@.service ${NodeSystemd}/${Memcached}@${UUID}.service
+
+  sed -i "/@Memcached@/{
+    s//${Memcached}/g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Memcached}@${UUID}.service
+  sed -i "/@ENV@/{
+    s::${ServerEtc}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Memcached}@${UUID}.service
+  sed -i "/@MEMCACHED@/{
+    s::${MemcachedInstallPath}/bin/memcached:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Memcached}@${UUID}.service
+
+  systemctl enable ${NodeSystemd}/${Memcached}@${UUID}.service
+
+  # user&group
+  echo
+  echo
+  getent group ${Group} &>/dev/null || (groupadd ${Group} && 
+    echo "groupadd ${Group}")
+  getent passwd ${User} &>/dev/null || (useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
+    echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}")
+
+  chown -R ${User}:${Group} ${ServerDataPath}
+  chown -R ${User}:${Group} ${ServerEtcPath}
+  chown -R ${User}:${Group} ${ServerVarPath}
+  chown -R ${User}:${Group} ${ServerLogPath}
+
+  echo
+  return 0
+}
+
+case "$1" in
+  install)
+    shift
+    install "$@"
+    ;;
+  group)
+    shift
+    group "$@"
+    ;;
+  server)
+    shift
+    server "$@"
+    ;;
+  *)
+    help
+    ;;
+esac

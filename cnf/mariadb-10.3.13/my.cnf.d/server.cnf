@@ -1,0 +1,92 @@
+#
+# These groups are read by MariaDB server.
+# Use it for options that only the server (but not clients) should see
+#
+# See the examples of server my.cnf files in /usr/share/mysql/
+#
+
+# this is read by the standalone daemon and embedded servers
+[server]
+
+# this is only for the mysqld standalone daemon
+[mysqld]
+port=@PORT@
+socket=@SOCKET@
+datadir=@DATADIR@
+
+pid_file=@PID@
+
+# character
+# https://mariadb.com/kb/en/library/setting-character-sets-and-collations/
+character_set_server=utf8
+collation_server=utf8_general_ci
+
+# logs
+# https://mariadb.com/kb/en/library/overview-of-mariadb-logs/
+log_output=FILE
+
+# error log
+# https://mariadb.com/kb/en/library/error-log/
+log_error=mariadb-error.log
+
+# general log
+# https://mariadb.com/kb/en/library/general-query-log/
+general_log=1
+general_log_file=mariadb-general.log
+
+# slow query log
+# https://mariadb.com/kb/en/library/slow-query-log-overview/
+slow_query_log=1
+slow_query_log-file=mariadb-slow.log
+long_query_time=10
+log_queries_not_using_indexes=1
+
+# binary log
+# https://mariadb.com/kb/en/library/binary-log/
+log_bin=mariadb-bin
+log_bin_index=mariadb-bin.index
+log_bin_compress=1
+
+# relay log
+# https://mariadb.com/kb/en/library/relay-log/
+relay_log=mariadb-relay-bin
+relay_log_index=mariadb-relay-bin.index
+relay_log_info_file=mariadb-relay-bin.info
+
+# innodb
+# https://mariadb.com/kb/en/library/innodb-system-variables/#innodb_log_files_in_group
+innodb_file_per_table=1
+
+#
+# * Galera-related settings
+#
+[galera]
+# Mandatory settings
+#wsrep_on=ON
+#wsrep_provider=
+#wsrep_cluster_address=
+#binlog_format=row
+#default_storage_engine=InnoDB
+#innodb_autoinc_lock_mode=2
+#
+# Allow server to accept connections on all interfaces.
+#
+#bind-address=0.0.0.0
+#
+# Optional setting
+#wsrep_slave_threads=1
+#innodb_flush_log_at_trx_commit=0
+
+# this is only for embedded server
+[embedded]
+
+# This group is only read by MariaDB servers, not by MySQL.
+# If you use the same .cnf file for MySQL and MariaDB,
+# you can put MariaDB-only options here
+[mariadb]
+
+# This group is only read by MariaDB-10.3 servers.
+# If you use the same .cnf file for MariaDB of different versions,
+# use this group for options that older servers don't understand
+[mariadb-10.3]
+

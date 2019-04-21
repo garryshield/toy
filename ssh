@@ -1,45 +1,85 @@
 #!/usr/bin/env bash
 
-# Name: const;
-# Desc: an auto web server installation tool;
-# Date: 2013-02-07 by garryshield;
+# Name: ssh
+# Desc: an auto web server installation tool
+# Date: 2013-02-07 by garryshield
 
-source ./const;
-source ./funs;
+source ./const
 
-echo "${Ssh} installation";
-echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
-read ;
-read ;
+help() {
+    echo "Usage: $0 {install} [option...]" >&2
+    echo
+    echo "    install port"
+    echo
+    # echo some stuff here for the -a or --add-options 
+    exit 1
+}
 
-# key
-ssh-keygen -t rsa;
+# ssh install <port>
+# <version> e.g. 22
+# ssh install 22
+install() {
+    echo "ssh config"
+    echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:'
+    read
+    read
 
-cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys;
-chmod 400 ~/.ssh/authorized_keys;
+    local Port=${1:-22}
 
-# sshd_config
-/bin/cp ${HostSetUpCnfPath}/${Ssh}/sshd_config /etc/ssh/sshd_config && \
-    echo "/bin/cp ${HostSetUpCnfPath}/${Ssh}/sshd_config /etc/ssh/sshd_config";
-sed -i "s:@PORT@:${SshPort}:" /etc/ssh/sshd_config;
+    # key
+    ssh-keygen -t rsa
 
-# port
-firewall-cmd --permanent --zone=public --service=ssh --add-port=${SshPort}/tcp
-firewall-cmd --permanent --zone=public --service=ssh --remove-port=22/tcp
-firewall-cmd --reload
+    cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
+    chmod 400 ~/.ssh/authorized_keys
 
-# restart
-# systemctl restart sshd.service
+    # sshd_config
+    /bin/cp -v /etc/ssh/sshd_config /etc/ssh/sshd_config-`date '+%Y-%m-%d(%H:%M:%S)'`
+    /bin/cp -v ${ToyCnfPath}/ssh/sshd_config /etc/ssh/sshd_config
 
-# done
-echo ;
-echo ;
-echo ================================================================================;
-echo "${Sshd} config SUCCESS";
-echo 'Configure Command:';
-echo '	Port '${SshPort};
-echo ================================================================================;
-echo ;
-echo ;
+    sed -i -E "/^Port 22$/{
+        s::Port ${Port}:g
+        w /dev/stdout
+    }" /etc/ssh/sshd_config
 
-exit 0;
+    sed -i -E "/^#PermitRootLogin yes$/{
+        s::PermitRootLogin yes:g
+        w /dev/stdout
+    }" /etc/ssh/sshd_config
+
+    sed -i -E "/^PasswordAuthentication yes$/{
+        s::PasswordAuthentication no:g
+        w /dev/stdout
+    }" /etc/ssh/sshd_config
+
+    # port
+    firewall-cmd --permanent --zone=public --service=ssh --remove-port=22/tcp
+    firewall-cmd --permanent --zone=public --service=ssh --add-port=${Port}/tcp
+    firewall-cmd --reload
+
+    # restart
+    # systemctl restart sshd.service
+
+    # done
+    echo
+    echo
+    echo ================================================================================
+    echo "ssh config SUCCESS"
+    echo "Configure:"
+    echo "    Port "${Port}
+    echo ================================================================================
+    echo "scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>"
+    echo
+    echo
+
+    exit 0
+}
+
+case "$1" in
+  install)
+    shift
+    install $*
+    ;;
+  *)
+    help
+    ;;
+esac

@@ -1,0 +1,11 @@
+[Unit]
+Description=@Memcached@ server
+After=network.target
+
+[Service]
+Type=forking
+EnvironmentFile=@ENV@
+ExecStart=@MEMCACHED@ -d -p $PORT -u $USER -m $CACHESIZE -c $MAXCONN $OPTIONS
+
+[Install]
+WantedBy=multi-user.target

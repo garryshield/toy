@@ -1,0 +1,15 @@
+[Unit]
+Description=@Nginx@ server
+After=syslog.target network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=forking
+EnvironmentFile=@ENV@
+PIDFile=$PID
+ExecStartPre=@NGINX_BIN@ -t -c $CONF
+ExecStart=@NGINX_BIN@ -c $CONF
+ExecReload=@NGINX_BIN@ -s reload -c $CONF
+ExecStop=/bin/kill -s QUIT $MAINPID
+
+[Install]
+WantedBy=multi-user.target

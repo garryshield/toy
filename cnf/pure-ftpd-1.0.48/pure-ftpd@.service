@@ -1,0 +1,15 @@
+# pure-ftpd binary startup for DirectAdmin servers
+# To reload systemd daemon after changes to this file:
+# systemctl --system daemon-reload
+
+[Unit]
+Description=@PureFtpd@ server
+After=syslog.target network.target
+
+[Service]
+Type=forking
+PIDFile=@PID@
+ExecStart=@PURE_FTPD@ @CONF@
+
+[Install]
+WantedBy=multi-user.target

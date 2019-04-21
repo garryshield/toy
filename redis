@@ -1,114 +1,325 @@
 #!/usr/bin/env bash
 
-# Name: const;
-# Desc: an auto web server installation tool;
-# Date: 2013-02-07 by garryshield;
+# Name: redis
+# Desc: an auto web server installation tool
+# Date: 2013-02-07 by garryshield
 
-source ./const;
-source ./funs;
+source ./const
 
-echo "${Redis} installation";
-echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
-read ;
-read ;
+help() {
+    echo "Usage: $0 {install|group|server|help} [option...]" >&2
+    echo
+    echo "    install <version>"
+    echo "    group -v=<version> -p=<prefix>"
+    echo "    server -v=<version> -p=<prefix> -P=<port>"
+    echo
+    # echo some stuff here for the -a or --add-options 
+    exit 1
+}
 
+# redis install <version>
+# <version> e.g. 5.0.4
+# redis install 5.0.4
+install() {
+  if [ "$#" -ne 1 ]; then
+    help
+    exit 1
+  fi
 
-# uninstall
-if [ -d ${RedisInstallPath} ]; then
-  systemctl stop ${Redis}.service;
-  systemctl disable ${Redis}.service;
+  local Redis=redis-$1
+  local RedisPackName=redis-$1.tar.gz
+  local RedisUrlPath=http://download.redis.io/releases/${RedisPackName}
+  # local RedisUrlPath=http://192.168.113.1:8080/${RedisPackName}
+  local RedisSrcPath=${ToySrcPath}/${Redis}
+  local RedisTarPath=${ToyTmpPath}/${Redis}
+  local RedisPackPath=${ToySrcPath}/${Redis}/${RedisPackName}
+  local RedisInstallPath=${ToySoftPath}/${Redis}
 
-  firewall-cmd --permanent --zone=public --remove-port=${RedisPort}/tcp;
-  firewall-cmd --reload;
+  echo "${Redis} installation"
+  echo "pleace input <Enter> twice to continue or <CTRL+C> to exit:"
+  read
+  read
 
-  mv ${HostSitesPath}/${Redis} ${HostSitesPath}/${Redis}-`date '+%Y-%m-%d(%H:%M:%S)'`;
-  mv ${RedisInstallPath} ${RedisInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`;
-fi;
+  # backup
+  if [ -d "${RedisInstallPath}" ]; then
+    mv ${RedisInstallPath} ${RedisInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`
+  fi
 
-# rm -rf ${RedisSrcPath};
-rm -rf ${RedisTarPath};
+  rm -rf ${RedisSrcPath}
+  rm -rf ${RedisTarPath}
 
-# download
-mkdir -p ${RedisSrcPath};
-if [ ! -f ${RedisPackPath} ]; then
-  wget ${RedisUrlPath} -O ${RedisPackPath};
-fi;
+  mkdir -p ${RedisSrcPath}
+  mkdir -p ${RedisTarPath}
 
-# const
-RedisEtcPath=${HostSitesPath}/${Redis}/etc;
-mkdir -p ${RedisEtcPath};
+  wget ${RedisUrlPath} -O ${RedisPackPath}
 
-RedisLogPath=${HostSitesPath}/${Redis}/log;
-mkdir -p ${RedisLogPath};
+  local retVal=$?
+  if [ "${retVal}" -ne 0 ]; then
+      exit ${retVal}
+  fi
 
-RedisVarPath=${HostSitesPath}/${Redis}/var;
-mkdir -p ${RedisVarPath};
+  tar -zxvf ${RedisPackPath} -C ${RedisTarPath}
+  cd ${RedisTarPath}/${Redis}
 
-RedisDataPath=${HostSitesPath}/${Redis}/data;
-mkdir -p ${RedisDataPath};
+  # configure
+  ./configure --help > ../configure
 
-RedisSysPath=${HostSitesPath}/${Redis}/systemd;
-mkdir -p ${RedisSysPath};
+  local RedisConfigure=(
+    PREFIX=${RedisInstallPath}
+  )
 
-# user & group
-remove_user ${RedisUser};
-remove_group ${RedisGroup};
-groupadd ${RedisGroup};
-useradd -s /sbin/nologin -d /dev/null -M -g ${RedisUser} ${RedisGroup};
+  for item in ${RedisConfigure[@]}; do
+    echo ${item} >> ../option
+  done
 
-# port
-firewall-cmd --permanent --zone=public --add-port=${RedisPort}/tcp;
-firewall-cmd --reload;
+  make -j 8 ${RedisConfigure[@]} install 2> ../install.err
 
-# installation
-mkdir -p ${RedisTarPath};
+  # done
+  echo
+  echo
+  echo ================================================================================
+  echo "${Redis} installation SUCCESS"
+  echo "Configure:"
+  for item in ${RedisConfigure[@]}; do
+    echo "    ${item}"
+  done
+  echo ================================================================================
+  echo
+  echo
 
-tar -zxvf ${RedisPackPath} -C ${RedisTarPath};
-cd ${RedisTarPath}/${Redis};
+  exit 0
+}
 
-make -j 8 PREFIX=${RedisInstallPath} install 2> ../install.err;
+# redis group 
+# -v, --version
+# -p, --prefix
+# redis group -v=5.0.4 -p=/var/sites/www_test_com
+# redis group -v=5.0.4 -p=/var/sites/www_test_com
+group(){
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      *)
 
-# redis.conf
-echo ;
-echo ;
-echo "redis.conf";
-/bin/cp ${HostSetUpCnfPath}/${Redis}/redis.conf ${RedisEtcPath}/redis.conf && \
-  echo "/bin/cp ${HostSetUpCnfPath}/${Redis}/redis.conf ${RedisEtcPath}/redis.conf";
+      ;;
+  esac
+  done
 
-sed -i "s:@PORT@:${RedisPort}:" ${RedisEtcPath}/redis.conf;
-sed -i "s:@PID_FILE@:${RedisVarPath}/redis.pid:" ${RedisEtcPath}/redis.conf;
-sed -i "s:@LOG_FILE@:${RedisLogPath}/redis.log:" ${RedisEtcPath}/redis.conf;
-sed -i "s:@DIR@:${RedisDataPath}:" ${RedisEtcPath}/redis.conf;
+  if [ -z "$Version" ] || [ -z "$Prefix" ]; then
+    help
+    exit 1
+  fi
 
-# redis.server
-echo ;
-echo ;
-echo "redis.server";
-/bin/cp ${HostSetUpCnfPath}/${Redis}/redis.service ${RedisSysPath}/${Redis}.service && \
-  echo "/bin/cp ${HostSetUpCnfPath}/${Redis}/redis.server ${RedisSysPath}/${Redis}.service";
+  local Redis=redis-$Version
+  local RedisInstallPath=${ToySoftPath}/${Redis}
 
-sed -i "s:@USER@:${RedisUser}:" ${RedisSysPath}/${Redis}.service;
-sed -i "s:@GROUP@:${RedisGroup}:" ${RedisSysPath}/${Redis}.service;
-sed -i "s:@PID_FILE@:${RedisVarPath}/redis.pid:" ${RedisSysPath}/${Redis}.service;
-sed -i "s:@REDIS_SERVER@:${RedisInstallPath}/bin/redis-server:" ${RedisSysPath}/${Redis}.service;
-sed -i "s:@REDIS_CONF@:${RedisEtcPath}/redis.conf:" ${RedisSysPath}/${Redis}.service;
+  if [ ! -d "${RedisInstallPath}" ]; then
+    echo "${Redis} is not installed yet"
+    exit 1
+  fi
 
-systemctl enable ${RedisSysPath}/${Redis}.service;
+  local NodePath=${Prefix}/${Redis}
 
-chown -R ${RedisUser}:${RedisGroup} ${HostSitesPath}/${Redis};
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
 
-# done
-echo ;
-echo ;
-echo ================================================================================;
-echo "${Redis} installation SUCCESS";
-echo "Configure Command:";
-for itm in ${RedisConfigure}; do
-	echo "	"$itm;
-done;
-echo "systemctl {start|stop|reload} ${Redis}";
-echo ================================================================================;
-echo ;
-echo ;
+  mkdir -p ${NodeData}
+  mkdir -p ${NodeEtc}
+  mkdir -p ${NodeVar}
+  mkdir -p ${NodeLog}
+  mkdir -p ${NodeSystemd}
 
-exit 0;
+  echo
+  return 0
+}
+
+# redis server 
+# -v, --version
+# -p, --prefix
+# -P, --port
+# redis server -v=1.5.12 -p=/var/sites/www_test_com -P=6379
+# redis server -v=1.5.12 -p=/var/sites/www_test_com -P=6380
+server(){
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      -P=*|--port=*)
+      local Port="${i#*=}"
+      shift
+      ;;
+      *)
+
+      ;;
+  esac
+  done
+
+  if [ -z "$Version" ] || [ -z "$Prefix" ] || [ -z "$Port" ]; then
+    help
+    exit 1
+  fi
+
+  local Redis=redis-$Version
+  local RedisInstallPath=${ToySoftPath}/${Redis}
+
+  if [ ! -d "${RedisInstallPath}" ]; then
+    echo "${Redis} is not installed yet"
+    exit 1
+  fi
+
+  local NodePath=${Prefix}/${Redis}
+
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
+
+  local ServerDataPath=${NodeData}/${Port}
+  local ServerEtcPath=${NodeEtc}/${Port}
+  local ServerVarPath=${NodeVar}/${Port}
+  local ServerLogPath=${NodeLog}/${Port}
+
+  local ServerEtc=${ServerEtcPath}/redis.conf
+  local ServerClusterEtc=${ServerEtcPath}/cluster.conf
+  local ServerPid=${ServerVarPath}/redis.pid
+  local ServerLog=${ServerLogPath}/redis.log
+  local ServerDB=dump.rdb
+  local ServerAOF=appendonly.aof
+
+  if [ -f "${ServerEtc}" ]; then
+    echo "${ServerEtc} already exists"
+    exit 1
+  fi
+
+  mkdir -p ${ServerDataPath}
+  mkdir -p ${ServerEtcPath}
+  mkdir -p ${ServerVarPath}
+  mkdir -p ${ServerLogPath}
+
+  local UUID=$(echo -n ${ServerEtc} | openssl md5 | awk '{print $2}')
+
+  # redis.conf
+  # https://github.com/antirez/redis/blob/5.0.4/redis.conf
+  echo
+  echo
+  echo "redis.conf"
+  /bin/cp -v ${ToyCnfPath}/${Redis}/redis.conf ${ServerEtc}
+
+  sed -i "/^bind 127.0.0.1/{
+    s::# bind 127.0.0.1:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^port 6379/{
+    s::port ${Port}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^daemonize no/{
+    s::daemonize yes:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^supervised no/{
+    s::supervised systemd:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^pidfile \/var\/run\/redis_6379.pid/{
+    s::pidfile ${ServerPid}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^logfile \"\"/{
+    s::logfile ${ServerLog}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^dir .\//{
+    s::dir ${ServerDataPath}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^dbfilename dump.rdb/{
+    s::dbfilename ${ServerDB}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  # sed -i "/^# requirepass foobared/{
+  #   s::requirepass foobared:g
+  #   w /dev/stdout
+  # }" ${ServerEtc}
+  sed -i "/^appendonly no/{
+    s::appendonly yes:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^appendfilename \"appendonly.aof\"/{
+    s::appendfilename \"${ServerAOF}\":g
+    w /dev/stdout
+  }" ${ServerEtc}
+
+  # cluster mode
+  # sed -i "/^# cluster-enabled yes/{
+  #   s::cluster-enabled yes:g
+  #   w /dev/stdout
+  # }" ${ServerEtc}
+  sed -i "/^# cluster-config-file nodes-6379.conf/{
+    s::cluster-config-file ${ServerClusterEtc}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+
+  # redis@.server
+  echo
+  echo
+  echo "redis@.server"
+  /bin/cp -v ${ToyCnfPath}/${Redis}/redis@.service ${NodeSystemd}/${Redis}@${UUID}.service
+
+  sed -i "/@Redis@/{
+    s//${Redis}/g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Redis}@${UUID}.service
+  sed -i "/@PID@/{
+    s::${ServerPid}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Redis}@${UUID}.service
+  sed -i "/@CONF@/{
+    s::${ServerEtc}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Redis}@${UUID}.service
+  sed -i "/@REDIS_SERVER@/{
+    s::${RedisInstallPath}/bin/redis-server:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Redis}@${UUID}.service
+
+  systemctl enable ${NodeSystemd}/${Redis}@${UUID}.service
+
+  echo
+  return 0
+}
+
+case "$1" in
+  install)
+    shift
+    install "$@"
+    ;;
+  group)
+    shift
+    group "$@"
+    ;;
+  server)
+    shift
+    server "$@"
+    ;;
+  *)
+    help
+    ;;
+esac

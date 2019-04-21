@@ -1,79 +1,113 @@
 #!/usr/bin/env bash
 
-# Name: init;
-# Desc: an auto web server installation tool;
-# Date: 2013-02-07 by garryshield;
+# Name: init
+# Desc: an auto web server installation tool
+# Date: 2013-02-07 by garryshield
 
-source ./const;
-source ./funs;
+source ./const
 
-echo 'initialiation and optimize';
-echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
-read ;
-read ;
+echo 'initialiation and optimize'
+echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:'
+read
+read
 
 # Disable SeLinux
 if [ -s /etc/selinux/config ]; then
-  sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config;
-  setenforce 0;
-fi;
+  sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+  setenforce 0
+fi
 
 # http://mirrors.163.com/.help/centos.html
 mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.backup
-curl http://mirrors.163.com/.help/CentOS7-Base-163.repo -o /etc/yum.repos.d/CentOS7-Base-163.repo;
+curl http://mirrors.163.com/.help/CentOS7-Base-163.repo -o /etc/yum.repos.d/CentOS7-Base-163.repo
 
 # https://fedoraproject.org/wiki/EPEL
-rpm -vih https://mirrors.ustc.edu.cn/epel/epel-release-latest-7.noarch.rpm;
-rpm --import https://mirrors.ustc.edu.cn/epel/RPM-GPG-KEY-EPEL-7;
+rpm -vih https://mirrors.ustc.edu.cn/epel/epel-release-latest-7.noarch.rpm
+rpm --import https://mirrors.ustc.edu.cn/epel/RPM-GPG-KEY-EPEL-7
 
-rm -rf ${HostSetUpTmpPath}/yum;
-mkdir -p ${HostSetUpTmpPath}/yum;
+rm -rf ${ToyTmpPath}/yum
+mkdir -p ${ToyTmpPath}/yum
 
 # https://www.softwarecollections.org/en/scls/rhscl/devtoolset-7
-for packages in centos-release-scl devtoolset-7; do
-  yum -y install $packages 2> ${HostSetUpTmpPath}/yum/$packages.err;
-done;
+# https://linux.cn/article-6776-1.html
+for packages in centos-release-scl scl-utils-build devtoolset-7; do
+  yum -y install $packages 2> ${ToyTmpPath}/yum/$packages.err
+done
 
 yum clean all
 yum makecache
 
-rpm -e `rpm -qa | grep mariadb` --nodeps;
+rpm -e `rpm -qa | grep mariadb` --nodeps
 
-for packages in make gcc gcc-c++ git tree wget curl curl-devel unzip patch redhat-lsb; do
-  yum -y install $packages 2> ${HostSetUpTmpPath}/yum/$packages.err;
-done;
+for packages in make gcc gcc-c++ git tree wget curl curl-devel unzip patch redhat-lsb yum-utils rpm-build net-tools; do
+  yum -y install $packages 2> ${ToyTmpPath}/yum/$packages.err
+done
 
 
-for packages in openssl openssl-devel zlib zlib-devel pcre pcre-devel libtool libtool-devel libatomic libatomic_ops-devel; do
-  yum -y install $packages 2> ${HostSetUpTmpPath}/yum/$packages.err;
-done;
+for packages in openssl openssl-devel zlib zlib-devel pcre pcre-devel libtool libtool-devel libatomic libatomic_ops-devel sqlite sqlite-devel xz xz-devel libffi-devel findutils; do
+  yum -y install $packages 2> ${ToyTmpPath}/yum/$packages.err
+done
 
 # nginx
 for packages in libxml2 libxml2-devel libxslt libxslt-devel gd gd-devel perl perl-devel perl-ExtUtils-Embed GeoIP GeoIP-devel gperftools gperftools-devel; do
-  yum -y install $packages 2> ${HostSetUpTmpPath}/yum/$packages.err;
-done;
+  yum -y install $packages 2> ${ToyTmpPath}/yum/$packages.err
+done
 
 # mariadb
-for packages in cmake ncurses ncurses-devel bison bison-devel jemalloc jemalloc-devel systemd-devel; do
-  yum -y install $packages 2> ${HostSetUpTmpPath}/yum/$packages.err;
-done;
+for packages in cmake cmake3 ncurses ncurses-devel bison bison-devel jemalloc jemalloc-devel systemd-devel libaio libaio-devel pam pam-devel; do
+  yum -y install $packages 2> ${ToyTmpPath}/yum/$packages.err
+done
 
 # php
-for packages in ImageMagick ImageMagick-devel libmemcached libmemcached-devel libacl libacl-devel enchant enchant-devel bzip2 bzip2-devel libcurl libcurl-devel libjpeg libjpeg-devel libpng libpng-devel libwebp libwebp-devel freetype freetype-devel gmp gmp-devel libmcrypt libmcrypt-devel readline readline-devel libxslt libxslt-devel icu libicu libicu-devel libedit libedit-devel recode recode-devel net-snmp net-snmp-devel mhash mhash-devel; do
-  yum -y install $packages 2> ${HostSetUpTmpPath}/yum/$packages.err;
-done;
+for packages in ImageMagick ImageMagick-devel libmemcached libmemcached-devel libzip libzip-devel libacl libacl-devel enchant enchant-devel bzip2 bzip2-devel libcurl libcurl-devel libjpeg libjpeg-devel libpng libpng-devel libwebp libwebp-devel freetype freetype-devel gmp gmp-devel libmcrypt libmcrypt-devel readline readline-devel libxslt libxslt-devel icu libicu libicu-devel libedit libedit-devel recode recode-devel net-snmp net-snmp-devel mhash mhash-devel re2c libargon2 libargon2-devel libtidy libtidy-devel; do
+  yum -y install $packages 2> ${ToyTmpPath}/yum/$packages.err
+done
 
 # pure-ftpd
 for packages in libsodium libsodium-devel; do
-  yum -y install $packages 2> ${HostSetUpTmpPath}/yum/$packages.err;
-done;
+  yum -y install $packages 2> ${ToyTmpPath}/yum/$packages.err
+done
 
 # memcached
 for packages in libevent libevent-devel; do
-  yum -y install $packages 2> ${HostSetUpTmpPath}/yum/$packages.err;
-done;
+  yum -y install $packages 2> ${ToyTmpPath}/yum/$packages.err
+done
 
+# java
+for packages in java-1.8.0-openjdk-devel; do
+  yum -y install $packages 2> ${ToyTmpPath}/yum/$packages.err
+done
+echo "" >> ~/.bashrc
+echo "# java" >> ~/.bashrc
+echo "export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk" >> ~/.bashrc
+echo "export PATH=\$PATH:\$JAVA_HOME/bin" >> ~/.bashrc
 
-yum -y update --exclude=kernel* --skip-broken;
+# libzip
+# php 7 --with-libzip
+yum -y remove libzip
+wget https://libzip.org/download/libzip-1.5.2.tar.gz -O ${ToySrcPath}/libzip-1.5.2.tar.gz
 
-exit 0;
+mkdir -p ${ToyTmpPath}/libzip-1.5.2
+tar -zxvf ${ToySrcPath}/libzip-1.5.2.tar.gz -C ${ToyTmpPath}/libzip-1.5.2
+cd ${ToyTmpPath}/libzip-1.5.2
+mkdir build
+cd build
+cmake3 ../libzip-1.5.2
+make -j 8
+make -j 8 install
+cd ../../
+
+echo '/usr/local/lib64
+/usr/local/lib
+/usr/lib
+/usr/lib64' >> /etc/ld.so.conf
+ldconfig -v
+
+# 
+sysctl -w vm.max_map_count=262144
+sysctl -p
+
+# update
+yum -y update --exclude=kernel* --skip-broken
+
+exit 0

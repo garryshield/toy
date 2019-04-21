@@ -1,0 +1,303 @@
+#!/usr/bin/env bash
+
+# Name: elasticsearch
+# Desc: an auto web server installation tool
+# Date: 2013-02-07 by garryshield
+
+source ./const
+
+help() {
+    echo "Usage: $0 {install|group|server|help} [option...]" >&2
+    echo
+    echo "    install <version>"
+    echo "    group -v=<version> -p=<prefix>"
+    echo "    server -v=<version> -p=<prefix> -P=<port> -u=<user> -g=<group>"
+    echo
+    # echo some stuff here for the -a or --add-options 
+    exit 1
+}
+
+# elasticsearch install <version>
+# <version> e.g. 6.7.0
+# elasticsearch install 6.7.0
+install() {
+  if [ "$#" -ne 1 ]; then
+    help
+    exit 1
+  fi
+
+  local ES=elasticsearch-$1
+  local ESPackName=elasticsearch-$1.tar.gz
+  local ESUrlPath=https://artifacts.elastic.co/downloads/elasticsearch/${ESPackName}
+  # local ESUrlPath=http://192.168.113.1:8080/${ESPackName}
+  local ESSrcPath=${ToySrcPath}/${ES}
+  local ESTarPath=${ToyTmpPath}/${ES}
+  local ESPackPath=${ToySrcPath}/${ES}/${ESPackName}
+  local ESInstallPath=${ToySoftPath}/${ES}
+
+  echo "${ES} installation"
+  echo "pleace input <Enter> twice to continue or <CTRL+C> to exit:"
+  read
+  read
+
+  # backup
+  if [ -d "${ESInstallPath}" ]; then
+    mv ${ESInstallPath} ${ESInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`
+  fi
+
+  rm -rf ${ESSrcPath}
+  rm -rf ${ESTarPath}
+
+  mkdir -p ${ESSrcPath}
+  mkdir -p ${ESTarPath}
+
+  wget ${ESUrlPath} -O ${ESPackPath}
+
+  local retVal=$?
+  if [ "${retVal}" -ne 0 ]; then
+      exit ${retVal}
+  fi
+
+  tar -zxvf ${ESPackPath} -C ${ESTarPath}
+  /bin/cp -rf ${ESTarPath}/${ES} ${ToySoftPath}
+
+  # done
+  echo
+  echo
+  echo ================================================================================
+  echo "${ES} installation SUCCESS"
+  echo ================================================================================
+  echo
+  echo
+
+  exit 0
+}
+
+# elasticsearch group 
+# -v, --version
+# -p, --prefix
+# elasticsearch group -v=6.7.0 -p=/var/sites/www_test_com
+# elasticsearch group -v=6.7.0 -p=/var/sites/www_test_com
+group(){
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      *)
+
+      ;;
+  esac
+  done
+
+  if [ -z "$Version" ] || [ -z "$Prefix" ]; then
+    help
+    exit 1
+  fi
+
+  local ES=elasticsearch-$Version
+  local ESInstallPath=${ToySoftPath}/${ES}
+
+  if [ ! -d "${ESInstallPath}" ]; then
+    echo "${ES} is not installed yet"
+    exit 1
+  fi
+
+  local NodePath=${Prefix}/${ES}
+
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
+
+  mkdir -p ${NodeData}
+  mkdir -p ${NodeEtc}
+  mkdir -p ${NodeVar}
+  mkdir -p ${NodeLog}
+  mkdir -p ${NodeSystemd}
+
+  echo
+  return 0
+}
+
+# elasticsearch server 
+# -v, --version
+# -p, --prefix
+# -P, --port
+# -u, --user
+# -g, --group
+# elasticsearch server -v=6.7.0 -p=/var/sites/www_test_com -P=9200 -u=elasticsearch-6.7.0 -g=www
+# elasticsearch server -v=6.7.0 -p=/var/sites/www_test_com -P=9201 -u=elasticsearch-6.7.0 -g=www
+server(){
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      -P=*|--port=*)
+      local Port="${i#*=}"
+      shift
+      ;;
+      -u=*|--user=*)
+      local User="${i#*=}"
+      shift
+      ;;
+      -g=*|--group=*)
+      local Group="${i#*=}"
+      shift
+      ;;
+      *)
+
+      ;;
+  esac
+  done
+
+  if [ -z "$Version" ] || [ -z "$Prefix" ] || [ -z "$Port" ]; then
+    help
+    exit 1
+  fi
+
+  local ES=elasticsearch-$Version
+  local ESInstallPath=${ToySoftPath}/${ES}
+
+  local User=${User:-${ES}}
+  local Group=${Group:-www}
+
+  if [ ! -d "${ESInstallPath}" ]; then
+    echo "${ES} is not installed yet"
+    exit 1
+  fi
+
+  local NodePath=${Prefix}/${ES}
+
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
+
+  local ServerDataPath=${NodeData}/${Port}
+  local ServerEtcPath=${NodeEtc}/${Port}
+  local ServerVarPath=${NodeVar}/${Port}
+  local ServerLogPath=${NodeLog}/${Port}
+
+  local ServerEtc=${ServerEtcPath}/elasticsearch.yml
+  local ServerPid=${ServerVarPath}/elasticsearch.pid
+
+  if [ -d "${ServerEtc}" ]; then
+    echo "${ServerEtc} already exists"
+    exit 1
+  fi
+
+  mkdir -p ${ServerDataPath}
+  mkdir -p ${ServerEtcPath}
+  mkdir -p ${ServerVarPath}
+  mkdir -p ${ServerLogPath}
+
+  local UUID=$(echo -n ${ServerEtc} | openssl md5 | awk '{print $2}')
+
+  # config
+  echo
+  echo
+  /bin/cp -v ${ToyCnfPath}/${ES}/config/* ${ServerEtcPath}
+
+  sed -i "/^#path.data\: \/path\/to\/data/{
+    s::path.data\: ${ServerDataPath}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^#path.logs\: \/path\/to\/logs/{
+    s::path.logs\: ${ServerLogPath}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^#http.port\: 9200/{
+    s::http.port\: ${Port}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^#bootstrap.memory_lock\: true/{
+    s::bootstrap.memory_lock\: true:g
+    w /dev/stdout
+  }" ${ServerEtc}
+
+  # elasticsearch@.server
+  # https://github.com/elastic/elasticsearch/blob/v6.7.0/distribution/packages/src/common/systemd/elasticsearch.service
+  echo
+  echo
+  echo "elasticsearch@.server"
+  /bin/cp -v ${ToyCnfPath}/${ES}/elasticsearch@.service ${NodeSystemd}/${ES}@${UUID}.service
+
+  sed -i "/@Elasticsearch@/{
+    s//${ES}/g
+    w /dev/stdout
+  }" ${NodeSystemd}/${ES}@${UUID}.service
+  sed -i "/@ES_HOME@/{
+    s::${ESInstallPath}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${ES}@${UUID}.service
+  sed -i "/@ES_PATH_CONF@/{
+    s::${ServerEtcPath}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${ES}@${UUID}.service
+  sed -i "/@PID_FILE@/{
+    s::${ServerPid}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${ES}@${UUID}.service
+  sed -i "/@User@/{
+    s::${User}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${ES}@${UUID}.service
+  sed -i "/@Group@/{
+    s::${Group}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${ES}@${UUID}.service
+  sed -i "/@ELASTICSEARCH@/{
+    s::${ESInstallPath}/bin/elasticsearch:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${ES}@${UUID}.service
+
+  systemctl enable ${NodeSystemd}/${ES}@${UUID}.service
+
+  # user&group
+  echo
+  echo
+  getent group ${Group} &>/dev/null || (groupadd ${Group} && 
+    echo "groupadd ${Group}")
+  getent passwd ${User} &>/dev/null || (useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
+    echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}")
+
+  chown -R ${User}:${Group} ${ServerDataPath}
+  chown -R ${User}:${Group} ${ServerEtcPath}
+  chown -R ${User}:${Group} ${ServerVarPath}
+  chown -R ${User}:${Group} ${ServerLogPath}
+
+  echo
+  return 0
+}
+
+case "$1" in
+  install)
+    shift
+    install "$@"
+    ;;
+  group)
+    shift
+    group "$@"
+    ;;
+  server)
+    shift
+    server "$@"
+    ;;
+  *)
+    help
+    ;;
+esac

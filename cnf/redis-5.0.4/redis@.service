@@ -1,0 +1,13 @@
+[Unit]
+Description=@Redis@ In-Memory Data Store
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=@PID@
+ExecStart=@REDIS_SERVER@ @CONF@
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s QUIT $MAINPID
+
+[Install]
+WantedBy=multi-user.target

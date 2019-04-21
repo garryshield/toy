@@ -1,150 +1,345 @@
 #!/usr/bin/env bash
 
-# Name: const;
-# Desc: an auto web server installation tool;
-# Date: 2013-02-07 by garryshield;
+# Name: pure-ftpd
+# Desc: an auto web server installation tool
+# Date: 2013-02-07 by garryshield
 
-source ./const;
-source ./funs;
+source ./const
 
-echo "${PureFTPD} installation";
-echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
-read ;
-read ;
+help() {
+    echo "Usage: $0 {install|group|server|help} [option...]" >&2
+    echo
+    echo "    install <version>"
+    echo "    group -v=<version> -p=<prefix>"
+    echo "    server -v=<version> -p=<prefix> -P=<port>"
+    echo
+    # echo some stuff here for the -a or --add-options 
+    exit 1
+}
 
+# pure-ftpd install <version>
+# <version> e.g. 1.0.48
+# pure-ftpd install 1.0.48
+install() {
+  if [ "$#" -ne 1 ]; then
+    help
+    exit 1
+  fi
 
-# uninstall
-if [ -d ${PureFTPDInstallPath} ]; then
-  systemctl stop ${PureFTPD}.service;
-  systemctl disable ${PureFTPD}.service;
+  local PureFtpd=pure-ftpd-$1
+  local PureFtpdPackName=pure-ftpd-$1.tar.gz
+  local PureFtpdUrlPath=https://download.pureftpd.org/pub/pure-ftpd/releases/${PureFtpdPackName}
+  # local PureFtpdUrlPath=http://192.168.113.1:8080/${PureFtpdPackName}
+  local PureFtpdSrcPath=${ToySrcPath}/${PureFtpd}
+  local PureFtpdTarPath=${ToyTmpPath}/${PureFtpd}
+  local PureFtpdPackPath=${ToySrcPath}/${PureFtpd}/${PureFtpdPackName}
+  local PureFtpdInstallPath=${ToySoftPath}/${PureFtpd}
 
-  firewall-cmd --permanent --zone=public --remove-port=${PureFTPDPort}/tcp;
-  firewall-cmd --permanent --zone=public --remove-port=30000-50000/tcp;
-  firewall-cmd --reload;
+  echo "${PureFtpd} installation"
+  echo "pleace input <Enter> twice to continue or <CTRL+C> to exit:"
+  read
+  read
 
-  mv ${HostSitesPath}/${PureFTPD} ${HostSitesPath}/${PureFTPD}-`date '+%Y-%m-%d(%H:%M:%S)'`;
-  mv ${PureFTPDInstallPath} ${PureFTPDInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`;
-fi;
+  # backup
+  if [ -d "${PureFtpdInstallPath}" ]; then
+    mv ${PureFtpdInstallPath} ${PureFtpdInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`
+  fi
 
-# rm -rf ${PureFTPDSrcPath};
-rm -rf ${PureFTPDTarPath};
+  rm -rf ${PureFtpdSrcPath}
+  rm -rf ${PureFtpdTarPath}
 
-# download
-mkdir -p ${PureFTPDSrcPath};
-if [ ! -f ${PureFTPDPackPath} ]; then
-  wget ${PureFTPDUrlPath} -O ${PureFTPDPackPath};
-fi;
+  mkdir -p ${PureFtpdSrcPath}
+  mkdir -p ${PureFtpdTarPath}
 
-# const
-PureFTPDEtcPath=${HostSitesPath}/${PureFTPD}/etc;
-mkdir -p ${PureFTPDEtcPath};
+  wget ${PureFtpdUrlPath} -O ${PureFtpdPackPath}
 
-PureFTPDLogPath=${HostSitesPath}/${PureFTPD}/log;
-mkdir -p ${PureFTPDLogPath};
+  local retVal=$?
+  if [ "${retVal}" -ne 0 ]; then
+      exit ${retVal}
+  fi
 
-PureFTPDVarPath=${HostSitesPath}/${PureFTPD}/var;
-mkdir -p ${PureFTPDVarPath};
+  tar -zxvf ${PureFtpdPackPath} -C ${PureFtpdTarPath}
+  cd ${PureFtpdTarPath}/${PureFtpd}
 
-PureFTPDDataPath=${HostSitesPath}/${PureFTPD}/data;
-mkdir -p ${PureFTPDDataPath};
+  # configure
+  ./configure --help > ../configure
 
-PureFTPDSysPath=${HostSitesPath}/${PureFTPD}/systemd;
-mkdir -p ${PureFTPDSysPath};
+  local PureFtpdConfigure=(
+    --prefix=${PureFtpdInstallPath}
 
-# user & group
-remove_user ${PureFTPDUser};
-remove_group ${PureFTPDGroup};
-groupadd ${PureFTPDGroup};
-useradd -s /sbin/nologin -d /dev/null -M -g ${PureFTPDUser} ${PureFTPDGroup};
+    --with-everything
 
-# port
-firewall-cmd --permanent --zone=public --add-port=${PureFTPDPort}/tcp;
-firewall-cmd --permanent --zone=public --add-port=30000-50000/tcp;
-firewall-cmd --reload;
+    --with-tls
+  )
 
-# installation
-mkdir -p ${PureFTPDTarPath};
+  for item in ${PureFtpdConfigure[@]}; do
+    echo ${item} >> ../option
+  done
 
-tar -zxvf ${PureFTPDPackPath} -C ${PureFTPDTarPath};
-cd ${PureFTPDTarPath}/${PureFTPD};
+  ./configure ${PureFtpdConfigure[@]} 2> ../configure.err
 
-# TLS
-mkdir -p /etc/ssl/private;
-openssl dhparam -out ${PureFTPDDataPath}/pure-ftpd-dhparams.pem 2048;
-ln -s ${PureFTPDDataPath}/pure-ftpd-dhparams.pem /etc/ssl/private/pure-ftpd-dhparams.pem;
+  make -j 8 2> ../make.err
+  make -j 8 install 2> ../install.err
 
-openssl req -x509 -nodes -newkey rsa:2048 -sha256 -keyout ${PureFTPDDataPath}/pure-ftpd.pem -out ${PureFTPDDataPath}/pure-ftpd.pem;
-chmod 600 ${PureFTPDDataPath}/pure-ftpd.pem;
+  # done
+  echo
+  echo
+  echo ================================================================================
+  echo "${PureFtpd} installation SUCCESS"
+  echo "Configure:"
+  for item in ${PureFtpdConfigure[@]}; do
+    echo "    ${item}"
+  done
+  echo ================================================================================
+  echo
+  echo
 
-# configure
-./configure --help > ../configure;
+  exit 0
+}
 
-PureFTPDConfigure="\
-  --prefix=${PureFTPDInstallPath} \
-  --sysconfdir=${PureFTPDEtcPath} \
+# pure-ftpd group 
+# -v, --version
+# -p, --prefix
+# pure-ftpd group -v=1.0.48 -p=/var/sites/www_test_com
+group(){
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      *)
 
-  --with-tls \
-  --with-certfile=${PureFTPDDataPath}/pure-ftpd.pem\
+      ;;
+  esac
+  done
 
-  --with-everything \
-";
+  if [ -z "$Version" ] || [ -z "$Prefix" ]; then
+    help
+    exit 1
+  fi
 
-echo ${PureFTPDConfigure} > ../option;
+  local PureFtpd=pure-ftpd-$Version
+  local PureFtpdInstallPath=${ToySoftPath}/${PureFtpd}
 
-./configure ${PureFTPDConfigure} 2> ../configure.err;
+  if [ ! -d "${PureFtpdInstallPath}" ]; then
+    echo "${PureFtpd} is not installed yet"
+    exit 1
+  fi
 
-make -j 8 2> ../make.err;
-make -j 8 install 2> ../install.err;
+  local NodePath=${Prefix}/${PureFtpd}
 
-# pure-pw
-${PureFTPDInstallPath}/bin/pure-pw useradd ${PureFTPDUser} -u ${PureFTPDUser} -g ${PureFTPDGroup} -d ${HostSitesPath}/${Nginx}/data/html/ -f ${PureFTPDDataPath}/pure-ftpd.passwd;
-${PureFTPDInstallPath}/bin/pure-pw mkdb ${PureFTPDDataPath}/pure-ftpd.pdb -f ${PureFTPDDataPath}/pure-ftpd.passwd;
-${PureFTPDInstallPath}/bin/pure-pw show ${PureFTPDUser} -f ${PureFTPDDataPath}/pure-ftpd.passwd;
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
 
-# pure-ftpd.conf
-echo ;
-echo ;
-echo "pure-ftpd.conf";
-/bin/cp ${HostSetUpCnfPath}/${PureFTPD}/pure-ftpd.conf ${PureFTPDEtcPath}/pure-ftpd.conf && \
-  echo "/bin/cp ${HostSetUpCnfPath}/${PureFTPD}/pure-ftpd.conf ${PureFTPDEtcPath}/pure-ftpd.conf";
+  mkdir -p ${NodeData}
+  mkdir -p ${NodeEtc}
+  mkdir -p ${NodeVar}
+  mkdir -p ${NodeLog}
+  mkdir -p ${NodeSystemd}
 
-sed -i "s:@prefix@:${PureFTPDInstallPath}:" ${PureFTPDEtcPath}/pure-ftpd.conf;
-sed -i "s:@sysconfdir@:${PureFTPDEtcPath}:" ${PureFTPDEtcPath}/pure-ftpd.conf;
-sed -i "s:@PIDFile@:${PureFTPDVarPath}/pure-ftpd.pid:" ${PureFTPDEtcPath}/pure-ftpd.conf;
-sed -i "s:@PureDB@:${PureFTPDDataPath}/pure-ftpd.pdb:" ${PureFTPDEtcPath}/pure-ftpd.conf;
-sed -i "s:@Bind@:${PureFTPDPort}:" ${PureFTPDEtcPath}/pure-ftpd.conf;
-sed -i "s:@AltLog@:${PureFTPDLogPath}/pure-ftpd.log:" ${PureFTPDEtcPath}/pure-ftpd.conf;
-sed -i "s:@CertFile@:${PureFTPDDataPath}/pure-ftpd.pem:" ${PureFTPDEtcPath}/pure-ftpd.conf;
+  echo
+  return 0
+}
 
-# pure-ftpd.conf
-echo ;
-echo ;
-echo "pure-ftpd.conf";
-/bin/cp ${HostSetUpCnfPath}/${PureFTPD}/pure-ftpd.service ${PureFTPDSysPath}/${PureFTPD}.service && \
-  echo "/bin/cp ${HostSetUpCnfPath}/${PureFTPD}/pure-ftpd.service ${PureFTPDSysPath}/${PureFTPD}.service";
+# pure-ftpd server 
+# -v, --version
+# -p, --prefix
+# -P, --port
+# pure-ftpd server -v=1.0.48 -p=/var/sites/www_test_com -P=21
+server(){
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      -P=*|--port=*)
+      local Port="${i#*=}"
+      shift
+      ;;
+      *)
 
-sed -i "s:@PID_FILE@:${PureFTPDVarPath}/pure-ftpd.pid:" ${PureFTPDSysPath}/${PureFTPD}.service;
-sed -i "s:@CONF_FILE@:${PureFTPDEtcPath}/pure-ftpd.conf:" ${PureFTPDSysPath}/${PureFTPD}.service;
-sed -i "s:@PURE_FTPD@:${PureFTPDInstallPath}/sbin/pure-ftpd:" ${PureFTPDSysPath}/${PureFTPD}.service;
+      ;;
+  esac
+  done
 
-systemctl enable ${PureFTPDSysPath}/${PureFTPD}.service;
+  if [ -z "$Version" ] || [ -z "$Prefix" ] || [ -z "$Port" ]; then
+    help
+    exit 1
+  fi
 
-# done
-echo ;
-echo ;
-echo ================================================================================;
-echo "${PureFTPD} installation SUCCESS";
-echo "Configure Command:";
-for itm in ${PureFTPDConfigure}; do
-	echo "	"$itm;
-done;
-echo "systemctl {start|stop|reload} ${PureFTPD}";
-echo ;
-echo "pdb manager:";
-echo "pure-pw useradd username -u uid -g gid -d homedir -f passwdfile";
-echo "pure-pw mkdb pdbfile -f passwdfile";
-echo ================================================================================;
-echo ;
-echo ;
+  local PureFtpd=pure-ftpd-$Version
+  local PureFtpdInstallPath=${ToySoftPath}/${PureFtpd}
 
-exit 0;
+  if [ ! -d "${PureFtpdInstallPath}" ]; then
+    echo "${PureFtpd} is not installed yet"
+    exit 1
+  fi
+
+  local NodePath=${Prefix}/${PureFtpd}
+
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
+
+  local ServerDataPath=${NodeData}/${Port}
+  local ServerEtcPath=${NodeEtc}/${Port}
+  local ServerVarPath=${NodeVar}/${Port}
+  local ServerLogPath=${NodeLog}/${Port}
+
+  local ServerEtc=${ServerEtcPath}/pure-ftpd.conf
+  local ServerPid=${ServerVarPath}/pure-ftpd.pid
+  local ServerLog=${ServerLogPath}/pure-ftpd.log
+  local ServerDB=${ServerDataPath}/pure-ftpd.pdb
+  local ServerCertFile=${ServerDataPath}/pure-ftpd.pem
+
+  if [ -f "${ServerEtc}" ]; then
+    echo "${ServerEtc} already exists"
+    exit 1
+  fi
+
+  local UUID=$(echo -n ${ServerEtc} | openssl md5 | awk '{print $2}')
+
+  mkdir -p ${ServerDataPath}
+  mkdir -p ${ServerEtcPath}
+  mkdir -p ${ServerVarPath}
+  mkdir -p ${ServerLogPath}
+
+  # TLS
+  openssl req -x509 -nodes -newkey rsa:2048 -sha256 -keyout ${ServerCertFile} -out ${ServerCertFile}
+  chmod 600 ${ServerCertFile}
+
+  # pure-ftpd.conf
+  # https://github.com/jedisct1/pure-ftpd/blob/1.0.48/pure-ftpd.conf.in
+  echo
+  echo
+  echo "pure-ftpd.conf"
+  /bin/cp -v ${ToyCnfPath}/${PureFtpd}/pure-ftpd.conf ${ServerEtc}
+
+  sed -i "/@sbindir@/{
+    s::${PureFtpdInstallPath}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/@sysconfdir@/{
+    s::${PureFtpdInstallPath}/etc:g
+    w /dev/stdout
+  }" ${ServerEtc}
+
+  sed -i "/^# PIDFile \+\/var\/run\/pure-ftpd.pid/{
+    s::PIDFile ${ServerPid}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^# PureDB \+\/etc\/pureftpd.pdb/{
+    s::PureDB ${ServerDB}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^# PassivePortRange \+30000 50000/{
+    s::PassivePortRange 30000 50000:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^# Bind \+127.0.0.1,21/{
+    s::Bind ${Port}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^# AltLog \+clf\:\/var\/log\/pureftpd.log/{
+    s::AltLog clf\:${ServerLog}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^# AltLog \+stats\:\/var\/log\/pureftpd.log/{
+    s::# AltLog stats\:${ServerLog}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^# AltLog \+w3c\:\/var\/log\/pureftpd.log/{
+    s::# AltLog w3c\:${ServerLog}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^# TLS \+1/{
+    s::TLS 1:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^# CertFile \+\/etc\/ssl\/private\/pure-ftpd.pem/{
+    s::CertFile ${ServerCertFile}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/^# IPV4Only \+yes/{
+    s::IPV4Only yes:g
+    w /dev/stdout
+  }" ${ServerEtc}
+
+  # pure-ftpd@.server
+  echo
+  echo
+  echo "pure-ftpd@.server"
+  /bin/cp -v ${ToyCnfPath}/${PureFtpd}/pure-ftpd@.service ${NodeSystemd}/${PureFtpd}@${UUID}.service
+
+  sed -i "/@PureFtpd@/{
+    s//${PureFtpd}/g
+    w /dev/stdout
+  }" ${NodeSystemd}/${PureFtpd}@${UUID}.service
+  sed -i "/@PID@/{
+    s::${ServerPid}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${PureFtpd}@${UUID}.service
+  sed -i "/@CONF@/{
+    s::${ServerEtc}:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${PureFtpd}@${UUID}.service
+  sed -i "/@PURE_FTPD@/{
+    s::${PureFtpdInstallPath}/sbin/pure-ftpd:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${PureFtpd}@${UUID}.service
+
+  systemctl enable ${NodeSystemd}/${PureFtpd}@${UUID}.service
+
+  # firewall
+  echo
+  echo
+  firewall-cmd --permanent --zone=public --add-port=30000-50000/tcp
+
+  [[ $(firewall-cmd --list-ports --zone=public | grep ${Port}/tcp) ]] || (
+      firewall-cmd --permanent --zone=public --add-port=${Port}/tcp && 
+      echo "firewall-cmd --permanent --zone=public --add-port=${Port}/tcp" &&
+      firewall-cmd --reload &&
+      echo "firewall-cmd --reload"
+    )
+
+  # pure-pw
+  # pure-pw useradd <login> -u <user> -g <group> -d <home> -f <pure-ftpd.passwd>
+  # pure-pw mkdb <pure-ftpd.pdb> -f <pure-ftpd.passwd>
+  # pure-pw show <login> -f <pure-ftpd.passwd>
+
+  echo
+  return 0
+}
+
+case "$1" in
+  install)
+    shift
+    install "$@"
+    ;;
+  group)
+    shift
+    group "$@"
+    ;;
+  server)
+    shift
+    server "$@"
+    ;;
+  *)
+    help
+    ;;
+esac

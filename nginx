@@ -1,211 +1,503 @@
 #!/usr/bin/env bash
 
-# Name: const;
-# Desc: an auto web server installation tool;
-# Date: 2013-02-07 by garryshield;
+# Name: nginx
+# Desc: an auto web server installation tool
+# Date: 2013-02-07 by garryshield
 
-source ./const;
-source ./funs;
+source ./const
 
-echo "${Nginx} installation";
-echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:';
-read ;
-read ;
+help() {
+    echo "Usage: $0 {install|group|server|help} [option...]" >&2
+    echo
+    echo "    install <version>"
+    echo "    group -v=<version> -p=<prefix> -n=<name> -u=<user> -g=<group>"
+    echo "    server -v=<version> -p=<prefix> -n=<name> -s=<server> -P=<port> -r=<root> --server-name=<server-name>"
+    echo
+    # echo some stuff here for the -a or --add-options 
+    exit 1
+}
 
-# uninstall
-if [ -d ${NginxInstallPath} ]; then
-  systemctl stop ${Nginx}.service;
-  systemctl disable ${Nginx}.service;
+# nginx install <version>
+# <version> e.g. 1.14.2
+# nginx install 1.14.2
+install() {
+  if [ "$#" -ne 1 ]; then
+    help
+    exit 1
+  fi
 
-  firewall-cmd --permanent --zone=public --remove-port=${NginxPort}/tcp;
-  firewall-cmd --reload;
+  local Nginx=nginx-$1
+  local NginxPackName=nginx-$1.tar.gz
+  local NginxUrlPath=https://nginx.org/download/${NginxPackName}
+  local NginxSrcPath=${ToySrcPath}/${Nginx}
+  local NginxTarPath=${ToyTmpPath}/${Nginx}
+  local NginxPackPath=${ToySrcPath}/${Nginx}/${NginxPackName}
+  local NginxInstallPath=${ToySoftPath}/${Nginx}
 
-  mv ${HostSitesPath}/${Nginx} ${HostSitesPath}/${Nginx}-`date '+%Y-%m-%d(%H:%M:%S)'`;
-  mv ${NginxInstallPath} ${NginxInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`;
-fi;
+  echo "${Nginx} installation"
+  echo "pleace input <Enter> twice to continue or <CTRL+C> to exit:"
+  read
+  read
 
-# rm -rf ${NginxSrcPath};
-rm -rf ${NginxTarPath};
+  # backup
+  if [ -d "${NginxInstallPath}" ]; then
+    mv ${NginxInstallPath} ${NginxInstallPath}-`date '+%Y-%m-%d(%H:%M:%S)'`
+  fi
 
-# download
-mkdir -p ${NginxSrcPath};
-if [ ! -f ${NginxPackPath} ]; then
-  wget ${NginxUrlPath} -O ${NginxPackPath};
+  rm -rf ${NginxSrcPath}
+  rm -rf ${NginxTarPath}
+
+  mkdir -p ${NginxSrcPath}
+  mkdir -p ${NginxTarPath}
+
+  # https://www.nginx.com/resources/wiki/modules/echo/
+  wget ${NginxUrlPath} -O ${NginxPackPath} &&
   wget https://github.com/openresty/echo-nginx-module/archive/v0.61.tar.gz -O ${NginxSrcPath}/echo-nginx-module-0.61.tar.gz
-fi;
 
-# const
-NginxEtcPath=${HostSitesPath}/${Nginx}/etc;
-mkdir -p ${NginxEtcPath};
+  local retVal=$?
+  if [ "${retVal}" -ne 0 ]; then
+      exit ${retVal}
+  fi
 
-NginxLogPath=${HostSitesPath}/${Nginx}/log;
-mkdir -p ${NginxLogPath};
+  tar -zxvf ${NginxSrcPath}/echo-nginx-module-0.61.tar.gz -C ${NginxTarPath}
+  tar -zxvf ${NginxPackPath} -C ${NginxTarPath}
+  cd ${NginxTarPath}/${Nginx}
 
-NginxVarPath=${HostSitesPath}/${Nginx}/var;
-mkdir -p ${NginxVarPath};
+  # configure
+  # http://nginx.org/en/docs/configure.html
+  ./configure --help > ../configure
 
-NginxDataPath=${HostSitesPath}/${Nginx}/data;
-mkdir -p ${NginxDataPath}/html;
+  local NginxConfigure=(
+    --prefix=${NginxInstallPath}
+    # --sbin-path=${NginxInstallPath}/sbin/nginx
+    # --modules-path=${NginxInstallPath}/modules
+    # --conf-path=${NodeEtc}/nginx.conf
+    # --error-log-path=${NginxLogPath}/error.log
+    # --pid-path=${NginxVarPath}/nginx.pid
+    # --lock-path=${NginxVarPath}/nginx.lock
 
-NginxSysPath=${HostSitesPath}/${Nginx}/systemd;
-mkdir -p ${NginxSysPath};
+    # --user=${NginxUser}
+    # --group=${NginxGroup}
 
-# user & group
-remove_user ${NginxUser};
-remove_group ${NginxGroup};
-groupadd ${NginxGroup};
-useradd -s /sbin/nologin -d /dev/null -M -g ${NginxUser} ${NginxGroup};
+    --with-select_module
+    --with-poll_module
 
-# port
-firewall-cmd --permanent --zone=public --add-port=${NginxPort}/tcp;
-firewall-cmd --reload;
+    --with-threads
 
-# installation
-mkdir -p ${NginxTarPath};
+    --with-file-aio
 
-tar -zxvf ${NginxSrcPath}/echo-nginx-module-0.61.tar.gz -C ${NginxTarPath};
+    --with-http_ssl_module
+    --with-http_v2_module
+    --with-http_realip_module
+    --with-http_addition_module
+    --with-http_xslt_module
+    --with-http_xslt_module=dynamic
+    --with-http_image_filter_module
+    --with-http_image_filter_module=dynamic
 
-tar -zxvf ${NginxPackPath} -C ${NginxTarPath};
-cd ${NginxTarPath}/${Nginx};
+    --with-http_geoip_module
+    --with-http_geoip_module=dynamic
+    --with-http_sub_module
+    --with-http_dav_module
+    --with-http_flv_module
+    --with-http_mp4_module
+    --with-http_gunzip_module
+    --with-http_gzip_static_module
+    --with-http_auth_request_module
+    --with-http_random_index_module
+    --with-http_secure_link_module
+    --with-http_degradation_module
+    --with-http_slice_module
+    --with-http_stub_status_module
 
-# configure
-./configure --help > ../configure;
+    --with-http_perl_module
+    --with-http_perl_module=dynamic
 
-NginxConfigure="\
-	--prefix=${NginxInstallPath} \
-	--sbin-path=${NginxInstallPath}/sbin/nginx \
-  --modules-path=${NginxInstallPath}/modules \
-	--conf-path=${NginxEtcPath}/nginx.conf \
-	--error-log-path=${NginxLogPath}/error.log \
-	--pid-path=${NginxVarPath}/nginx.pid \
-	--lock-path=${NginxVarPath}/nginx.lock \
+    # --http-log-path=${NginxLogPath}/access.log
+    # --http-client-body-temp-path=${NginxVarPath}/client_body_temp
+    # --http-proxy-temp-path=${NginxVarPath}/proxy_temp
+    # --http-fastcgi-temp-path=${NginxVarPath}/fastcgi_temp
+    # --http-uwsgi-temp-path=${NginxVarPath}/uwsgi_temp
+    # --http-scgi-temp-path=${NginxVarPath}/scgi_temp
 
-	--user=${NginxUser} \
-	--group=${NginxGroup} \
+    --with-mail
+    --with-mail=dynamic
+    --with-mail_ssl_module
 
-  --with-select_module \
-  --with-poll_module \
+    --with-stream
+    --with-stream=dynamic
+    --with-stream_ssl_module
+    --with-stream_realip_module
+    --with-stream_geoip_module
+    --with-stream_geoip_module=dynamic
+    --with-stream_ssl_preread_module
 
-  --with-threads \
+    --with-google_perftools_module
+    --with-cpp_test_module
 
-  --with-file-aio \
+    --add-dynamic-module=${NginxTarPath}/echo-nginx-module-0.61
 
-	--with-http_ssl_module \
-  --with-http_v2_module \
-	--with-http_realip_module \
-  --with-http_addition_module \
-  --with-http_xslt_module \
-  --with-http_xslt_module=dynamic \
-	--with-http_image_filter_module \
-  --with-http_image_filter_module=dynamic \
+    --with-compat
 
-  --with-http_geoip_module \
-  --with-http_geoip_module=dynamic \
-  --with-http_sub_module \
-  --with-http_dav_module \
-  --with-http_flv_module \
-  --with-http_mp4_module \
-  --with-http_gunzip_module \
-  --with-http_gzip_static_module \
-  --with-http_auth_request_module \
-  --with-http_random_index_module \
-  --with-http_secure_link_module \
-  --with-http_degradation_module \
-  --with-http_slice_module \
-  --with-http_stub_status_module \
+    --with-pcre
 
-  --with-http_perl_module \
-  --with-http_perl_module=dynamic \
+    --with-libatomic
 
-	--http-log-path=${NginxLogPath}/access.log \
-  --http-client-body-temp-path=${NginxDataPath}/client_body_temp \
-  --http-proxy-temp-path=${NginxDataPath}/proxy_temp \
-  --http-fastcgi-temp-path=${NginxDataPath}/fastcgi_temp \
-  --http-uwsgi-temp-path=${NginxDataPath}/uwsgi_temp \
-  --http-scgi-temp-path=${NginxDataPath}/scgi_temp \
+    --with-debug
+  )
 
-  --with-mail \
-  --with-mail=dynamic \
-  --with-mail_ssl_module \
+  for item in ${NginxConfigure[@]}; do
+    echo ${item} >> ../option
+  done
 
-  --with-stream \
-  --with-stream=dynamic \
-  --with-stream_ssl_module \
-  --with-stream_realip_module \
-  --with-stream_geoip_module \
-  --with-stream_geoip_module=dynamic \
-  --with-stream_ssl_preread_module \
+  ./configure ${NginxConfigure[@]} 2> ../configure.err
 
-  --with-google_perftools_module \
-  --with-cpp_test_module \
+  make -j 8 2> ../make.err
+  make -j 8 install 2> ../install.err
 
-  --add-dynamic-module=${NginxTarPath}/echo-nginx-module-0.61 \
+  # done
+  echo
+  echo
+  echo ================================================================================
+  echo "${Nginx} installation SUCCESS"
+  echo "Configure:"
+  for item in ${NginxConfigure[@]}; do
+    echo "    ${item}"
+  done
+  echo ================================================================================
+  echo
+  echo
 
-  --with-compat \
+  exit 0
+}
 
-  --with-pcre \
+# nginx group 
+# -v, --version
+# -p, --prefix
+# -n, --name
+# -u, --user
+# -g, --group
+# nginx group -v=1.14.2 -p=/var/sites/www_test_com -n=frontend -u=nginx-1.14.2 -g=www
+# nginx group -v=1.14.2 -p=/var/sites/www_test_com -n=backend -u=nginx-1.14.2 -g=www
+group() {
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      -n=*|--name=*)
+      local Name="${i#*=}"
+      shift
+      ;;
+      -u=*|--user=*)
+      local User="${i#*=}"
+      shift
+      ;;
+      -g=*|--group=*)
+      local Group="${i#*=}"
+      shift
+      ;;
+      *)
 
-  --with-libatomic \
+      ;;
+  esac
+  done
 
-  --with-debug \
-";
+  if [ -z "$Version" ] || [ -z "$Prefix" ] || [ -z "$Name" ]; then
+    help
+    exit 1
+  fi
 
-echo ${NginxConfigure} > ../option;
+  local Nginx=nginx-$Version
+  local NginxInstallPath=${ToySoftPath}/${Nginx}
 
-./configure ${NginxConfigure} 2> ../configure.err;
+  local User=${User:-${Nginx}}
+  local Group=${Group:-www}
 
-make -j 8 2> ../make.err;
-make -j 8 install 2> ../install.err;
+  if [ ! -d "${NginxInstallPath}" ]; then
+    echo "${Nginx} is not installed yet"
+    exit 1
+  fi
 
-/bin/cp ${NginxInstallPath}/html/* ${NginxDataPath}/html/;
-echo "<?php phpinfo(); ?>" > ${NginxDataPath}/html/phpinfo.php;
+  local NodePath=${Prefix}/${Nginx}
 
-# nginx.conf
-echo ;
-echo ;
-echo "nginx.conf";
-/bin/cp ${HostSetUpCnfPath}/${Nginx}/nginx.conf ${NginxEtcPath}/nginx.conf && \
-  echo "/bin/cp ${HostSetUpCnfPath}/${Nginx}/nginx.conf ${NginxEtcPath}/nginx.conf";
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
 
-sed -i "s:@USER@:${NginxUser}:" ${NginxEtcPath}/nginx.conf;
-sed -i "s:@GROUP@:${NginxGroup}:" ${NginxEtcPath}/nginx.conf;
-sed -i "s:@ERROR_LOG_FILE@:${NginxLogPath}/error.log:" ${NginxEtcPath}/nginx.conf;
-sed -i "s:@PID_FILE@:${NginxVarPath}/nginx.pid:" ${NginxEtcPath}/nginx.conf;
-sed -i "s:@HTTP_LOG_FILE@:${NginxLogPath}/access.log:" ${NginxEtcPath}/nginx.conf;
+  local GroupData=${NodeData}/${Name}
+  local GroupEtc=${NodeEtc}/${Name}
+  local GroupVar=${NodeVar}/${Name}
+  local GroupLog=${NodeLog}/${Name}
 
-sed -i "s:@PORT@:${NginxPort}:" ${NginxEtcPath}/nginx.conf;
-sed -i "s:@ROOT@:${NginxDataPath}/html:" ${NginxEtcPath}/nginx.conf;
+  if [ -d "${GroupEtc}" ]; then
+    echo "${GroupEtc} already exists"
+    exit 1
+  fi
 
-sed -i "s:@HTDOCS@:${HostSitesWebPath}:" ${NginxEtcPath}/nginx.conf;
-sed -i "s:@NGINX@:${Nginx}:" ${NginxEtcPath}/nginx.conf;
+  mkdir -p ${NodeData}
+  mkdir -p ${NodeEtc}
+  mkdir -p ${NodeVar}
+  mkdir -p ${NodeLog}
+  mkdir -p ${NodeSystemd}
 
-${NginxInstallPath}/sbin/nginx -t -c ${NginxEtcPath}/nginx.conf;
+  mkdir -p ${GroupData}
+  mkdir -p ${GroupEtc}
+  mkdir -p ${GroupVar}
+  mkdir -p ${GroupLog}
+  mkdir -p ${GroupEtc}/conf.d
+  mkdir -p ${GroupEtc}/segment
 
-# nginx.server
-echo ;
-echo ;
-echo "nginx.server";
-/bin/cp ${HostSetUpCnfPath}/${Nginx}/nginx.service ${NginxSysPath}/${Nginx}.service && \
-  echo "/bin/cp ${HostSetUpCnfPath}/${Nginx}/nginx.server ${NginxSysPath}/${Nginx}.service";
+  local UUID=$(echo -n ${GroupEtc} | openssl md5 | awk '{print $2}')
 
-sed -i "s:@PID_FILE@:${NginxVarPath}/nginx.pid:" ${NginxSysPath}/${Nginx}.service;
-sed -i "s:@CONF_FILE@:${NginxEtcPath}/nginx.conf:" ${NginxSysPath}/${Nginx}.service;
-sed -i "s:@NGINX@:${NginxInstallPath}/sbin/nginx:" ${NginxSysPath}/${Nginx}.service;
+  # nginx@.server
+  echo
+  echo
+  echo "nginx@.server"
+  /bin/cp -v ${ToyCnfPath}/${Nginx}/nginx@.service ${NodeSystemd}/${Nginx}@${UUID}.service
 
-systemctl enable ${NginxSysPath}/${Nginx}.service;
+  sed -i "/@Nginx@/{
+    s//${Nginx}/g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Nginx}@${UUID}.service
+  sed -i "/@ENV@/{
+    s::${GroupEtc}/env:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Nginx}@${UUID}.service
+  sed -i "/@NGINX_BIN@/{
+    s::${NginxInstallPath}/sbin/nginx:g
+    w /dev/stdout
+  }" ${NodeSystemd}/${Nginx}@${UUID}.service
 
-# done
-echo ;
-echo ;
-echo ================================================================================;
-echo "${Nginx} installation SUCCESS";
-echo "Configure Command:";
-for itm in ${NginxConfigure}; do
-	echo "	"$itm;
-done;
-echo "systemctl {start|stop|reload} ${Nginx}";
-echo ================================================================================;
-echo ;
-echo ;
+  systemctl enable ${NodeSystemd}/${Nginx}@${UUID}.service
 
-exit 0;
+  # nginx.conf
+  echo
+  echo
+  echo "nginx.conf"
+  /bin/cp -v ${ToyCnfPath}/${Nginx}/nginx.conf ${GroupEtc}/nginx.conf
+
+  sed -i "/@USER@/{
+    s//${User}/g
+    w /dev/stdout
+  }" ${GroupEtc}/nginx.conf
+  sed -i "/@GROUP@/{
+    s//${Group}/g
+    w /dev/stdout
+  }" ${GroupEtc}/nginx.conf
+  sed -i "/@ERROR_LOG@/{
+    s::${GroupLog}/nginx.log:g
+    w /dev/stdout
+  }" ${GroupEtc}/nginx.conf
+  sed -i "/@PID@/{
+    s::${GroupVar}/nginx.pid:g
+    w /dev/stdout
+  }" ${GroupEtc}/nginx.conf
+  sed -i "/@VAR_PATH@/{
+    s::${GroupVar}:g
+    w /dev/stdout
+  }" ${GroupEtc}/nginx.conf
+
+  # segment
+  echo
+  echo
+  echo "segment"
+  /bin/cp -rfv ${ToyCnfPath}/${Nginx}/segment/* ${GroupEtc}/segment
+
+  # env
+  echo
+  echo
+  echo "env"
+  /bin/cp -v ${ToyCnfPath}/${Nginx}/env ${GroupEtc}/env
+
+  sed -i "/@PID@/{
+    s::${GroupVar}/nginx.pid:g
+    w /dev/stdout
+  }" ${GroupEtc}/env
+  sed -i "/@CONF@/{
+    s::${GroupEtc}/nginx.conf:g
+    w /dev/stdout
+  }" ${GroupEtc}/env
+
+  # user&group
+  echo
+  echo
+  getent group ${Group} &>/dev/null || (groupadd ${Group} && 
+    echo "groupadd ${Group}")
+  getent passwd ${User} &>/dev/null || (useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
+    echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}")
+
+  # chown -R ${User}:${Group} ${GroupData}
+  # chown -R ${User}:${Group} ${GroupEtc}
+  # chown -R ${User}:${Group} ${GroupVar}
+  # chown -R ${User}:${Group} ${GroupLog}
+
+  echo
+  return 0
+}
+
+# nginx server
+# -v, --version
+# -p, --prefix
+# -n, --name
+# -s, --server
+# -P, --port
+# -r, --root
+# --server-name
+# nginx server -v=1.14.2 -p=/var/sites/www_test_com -n=default -s=frontend -P=80 -r=/var/sites/www_test_com/frontend --server-name=frontend.test.com
+# nginx server -v=1.14.2 -p=/var/sites/www_test_com -n=default -s=backend -P=80 -r=/var/sites/www_test_com/backend --server-name=backend.test.com
+server() {
+  for i in "$@"; do
+  case $i in
+      -v=*|--version=*)
+      local Version="${i#*=}"
+      shift
+      ;;
+      -p=*|--prefix=*)
+      local Prefix="${i#*=}"
+      shift
+      ;;
+      -n=*|--name=*)
+      local Name="${i#*=}"
+      shift
+      ;;
+      -s=*|--server=*)
+      local Server="${i#*=}"
+      shift
+      ;;
+      -P=*|--port=*)
+      local Port="${i#*=}"
+      shift
+      ;;
+      -r=*|--root=*)
+      local Root="${i#*=}"
+      shift
+      ;;
+      --server-name=*)
+      local ServerName="${i#*=}"
+      shift
+      ;;
+      *)
+
+      ;;
+  esac
+  done
+
+  if [ -z "$Version" ] || [ -z "$Prefix" ] || [ -z "$Name" ] || [ -z "$Server" ]; then
+    help
+    exit 1
+  fi
+
+  local Nginx=nginx-$Version
+  local NginxInstallPath=${ToySoftPath}/${Nginx}
+
+  if [ ! -d "${NginxInstallPath}" ]; then
+    echo "${Nginx} is not installed yet"
+    exit 1
+  fi
+
+  local NodePath=${Prefix}/${Nginx}
+
+  local NodeData=${NodePath}/data
+  local NodeEtc=${NodePath}/etc
+  local NodeVar=${NodePath}/var
+  local NodeLog=${NodePath}/log
+  local NodeSystemd=${NodePath}/systemd
+
+  local GroupData=${NodeData}/${Name}
+  local GroupEtc=${NodeEtc}/${Name}
+  local GroupVar=${NodeVar}/${Name}
+  local GroupLog=${NodeLog}/${Name}
+
+  if [ ! -d "${GroupEtc}" ]; then
+    echo "${GroupEtc} not exists"
+    exit 1
+  fi
+
+  local ServerEtc=${GroupEtc}/conf.d/${Server}.conf
+  local ServerAccessLog=${GroupLog}/${Server}.access.log
+  local ServerErrorLog=${GroupLog}/${Server}.error.log
+  local ServerPort=${Port:-80}
+  local ServerRoot=${Root:-${GroupData}/${Server}}
+  local ServerName="${ServerName:-localhost}"
+
+  if [ -f "${ServerEtc}" ]; then
+    echo "${ServerEtc} already exists"
+    exit 1
+  fi
+
+  if [ ! -d "${ServerRoot}" ]; then
+    mkdir -p ${ServerRoot}
+
+    # html
+    echo
+    echo
+    echo "html"
+    /bin/cp -rfv ${ToyCnfPath}/${Nginx}/html/* ${ServerRoot}
+  fi
+
+  # www.conf
+  echo
+  echo
+  echo "www.conf"
+  /bin/cp -v ${ToyCnfPath}/${Nginx}/www.conf ${ServerEtc}
+
+  sed -i "/@PORT@/{
+    s::${ServerPort}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/server_name localhost;/{
+    s::server_name ${ServerName};:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/@ACCESS_LOG@/{
+    s::${ServerAccessLog}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/@ERROR_LOG@/{
+    s::${ServerErrorLog}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+  sed -i "/@ROOT@/{
+    s::${ServerRoot}:g
+    w /dev/stdout
+  }" ${ServerEtc}
+
+  # firewall
+  echo
+  echo
+  [[ $(firewall-cmd --list-ports --zone=public | grep ${ServerPort}/tcp) ]] || (
+      firewall-cmd --permanent --zone=public --add-port=${ServerPort}/tcp && 
+      echo "firewall-cmd --permanent --zone=public --add-port=${ServerPort}/tcp" &&
+      firewall-cmd --reload &&
+      echo "firewall-cmd --reload"
+    )
+
+  echo
+  return 0
+}
+
+case "$1" in
+  install)
+    shift
+    install "$@"
+    ;;
+  group)
+    shift
+    group "$@"
+    ;;
+  server)
+    shift
+    server "$@"
+    ;;
+  *)
+    help
+    ;;
+esac
