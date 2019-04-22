@@ -83,7 +83,7 @@ cd toy
 ./redis server -v=<version> -p=<prefix> -P=<port>
 ```
 
-#elasticsearch
+# elasticsearch
 ```
 ./elasticsearch install <version>
 ./elasticsearch group -v=<version> -p=<prefix>
@@ -92,6 +92,7 @@ cd toy
 
 # vhost
 默认端口
+
 | Version               | Port                |
 | -                     | -                   |
 | ssh                   | 22                  |
@@ -143,6 +144,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 
 # nginx vhost 结构
 /var/sites/<VHOST_ID>/nginx-<Version>
+
 ```
 .
 ├── data
@@ -183,6 +185,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 
 # php vhost 结构
 /var/sites/<VHOST_ID>/php-<Version>
+
 ```
 .
 ├── data
@@ -216,6 +219,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 
 # mariadb vhost 结构
 /var/sites/<VHOST_ID>/mariadb-<Version>
+
 ```
 .
 ├── data
