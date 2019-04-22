@@ -111,11 +111,11 @@ cd toy
 
 虚拟主机目录：
 ```
-/vat/sites/<VHOST_ID>
-/vat/sites/<VHOST_ID>/nginx-<Version> # 虚拟主机 nginx 配置
-/vat/sites/<VHOST_ID>/php-<Version> # 虚拟主机 php-fpm 配置
+/vat/sites/<vhost_id>
+/vat/sites/<vhost_id>/nginx-<version> # 虚拟主机 nginx 配置
+/vat/sites/<vhost_id>/php-<version> # 虚拟主机 php-fpm 配置
 ...
-/vat/sites/<VHOST_ID>/www # 虚拟主机根目录
+/vat/sites/<vhost_id>/www # 虚拟主机根目录
 ```
 
 # 安装顺序
@@ -143,7 +143,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 ```
 
 # nginx vhost 结构
-/var/sites/<VHOST_ID>/nginx-<Version>
+/var/sites/<vhost_id>/nginx-<version>
 
 ```
 .
@@ -184,7 +184,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 ```
 
 # php vhost 结构
-/var/sites/<VHOST_ID>/php-<Version>
+/var/sites/<vhost_id>/php-<version>
 
 ```
 .
@@ -218,7 +218,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 ```
 
 # mariadb vhost 结构
-/var/sites/<VHOST_ID>/mariadb-<Version>
+/var/sites/<vhost_id>/mariadb-<version>
 
 ```
 .
