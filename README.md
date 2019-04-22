@@ -143,7 +143,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 ```
 
 # nginx vhost 结构
-/var/sites/<vhost_id>/nginx-<version>
+/var/sites/<vhost_id>/nginx-\<version>
 
 ```
 .
@@ -184,7 +184,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 ```
 
 # php vhost 结构
-/var/sites/<vhost_id>/php-<version>
+/var/sites/<vhost_id>/php-\<version>
 
 ```
 .
@@ -218,7 +218,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 ```
 
 # mariadb vhost 结构
-/var/sites/<vhost_id>/mariadb-<version>
+/var/sites/<vhost_id>/mariadb-\<version>
 
 ```
 .
