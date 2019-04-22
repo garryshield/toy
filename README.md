@@ -143,7 +143,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 ```
 
 # nginx vhost 结构
-/var/sites/<vhost_id>/nginx-<version>
+/var/sites/<vhost_id>/nginx-\<version>
 
 ```
 .
