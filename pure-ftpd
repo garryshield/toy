@@ -308,14 +308,24 @@ server(){
   # firewall
   echo
   echo
-  firewall-cmd --permanent --zone=public --add-port=30000-50000/tcp
-
-  [[ $(firewall-cmd --list-ports --zone=public | grep ${Port}/tcp) ]] || (
-      firewall-cmd --permanent --zone=public --add-port=${Port}/tcp && 
-      echo "firewall-cmd --permanent --zone=public --add-port=${Port}/tcp" &&
-      firewall-cmd --reload &&
+  echo "firewall"
+  if firewall-cmd --list-ports --zone=public | grep ${Port}/tcp &>/dev/null; then
+    echo "${Port} already exists"
+  else
+    firewall-cmd --permanent --zone=public --add-port=${Port}/tcp &&
+      echo "firewall-cmd --permanent --zone=public --add-port=${Port}/tcp"
+    firewall-cmd --reload &&
       echo "firewall-cmd --reload"
-    )
+  fi
+
+  if firewall-cmd --list-ports --zone=public | grep 30000-50000/tcp &>/dev/null; then
+    echo "30000-50000 already exists"
+  else
+    firewall-cmd --permanent --zone=public --add-port=30000-50000/tcp &&
+      echo "firewall-cmd --permanent --zone=public --add-port=30000-50000/tcp"
+    firewall-cmd --reload &&
+      echo "firewall-cmd --reload"
+  fi
 
   # pure-pw
   # pure-pw useradd <login> -u <user> -g <group> -d <home> -f <pure-ftpd.passwd>

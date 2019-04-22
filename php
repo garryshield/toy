@@ -1122,10 +1122,18 @@ server() {
   # user&group
   echo
   echo
-  getent group ${Group} &>/dev/null || (groupadd ${Group} && 
-    echo "groupadd ${Group}")
-  getent passwd ${User} &>/dev/null || (useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
-    echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}")
+  echo "user&group"
+  if getent group ${Group} &>/dev/null; then
+    echo "${Group} already exists"
+  else
+    groupadd ${Group} && echo "groupadd ${Group}"
+  fi
+  if getent passwd ${User} &>/dev/null; then
+    echo "${User} already exists"
+  else
+    useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
+      echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}"
+  fi
 
   # pool 的 error.log 生成不了解决方法
   # https://stackoverflow.com/questions/8677493/php-fpm-doesnt-write-to-error-log/23223585#23223585

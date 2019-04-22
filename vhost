@@ -6,115 +6,224 @@
 
 source ./const
 
-echo "VHost installation";
-echo '1: create nginx vhost config file';
-echo '2: create php-fpm pool config file';
-echo '4: create pure-ftp support'
-echo '5: create memcached support'
-echo '6: create redis support'
-echo '7: create mariadb support'
-echo 'pleace input <Enter> twice to continue or <CTRL+C> to exit:'
+echo "VHost installation"
+echo "1: create nginx vhost config file"
+echo "2: create php-fpm pool config file"
+echo "4: create pure-ftp support"
+echo "5: create memcached support"
+echo "6: create redis support"
+echo "7: create mariadb support"
+echo "pleace input <Enter> twice to continue or <CTRL+C> to exit:"
 read
 read
 
-echo 'The options which with (*) prefix is required!';
-echo '';
+echo 'The options which with (*) prefix is required!'
+echo
 
 # Unique vhost ID
-echo "Set an unique vhost ID";
-echo "take the deamon name is cool";
-echo "e.g. App URL is <www.domain.com>, you can take <www_domain_com> as ID";
-echo -n "(*) ID:";
-read vhost_id;
+echo "Set an unique vhost ID"
+echo "take the deamon name is cool"
+echo "e.g. App URL is <www.domain.com>, you can take <www_domain_com> as ID"
+echo -n "(*) ID:"
+read vhost_id
 if [ "${vhost_id:+1}" != 1 ]; then
-  echo "Error: Must input an unique ID for nginx vhost";
-  exit 1;
-fi;
-echo "vhost_id: ${vhost_id}";
+  echo "Error: Must input an unique ID for nginx vhost"
+  exit 1
+fi
+echo "vhost_id: ${vhost_id}"
 
-echo ;
-echo "Set vhost user: (if not set take vhost ID ${vhost_id})";
-echo "user will created if not exists";
-echo -n "vhost user:";
-read vhost_user;
-vhost_user=${vhost_user:=${vhost_id}};
-echo "vhost_user: ${vhost_user}";
+echo 
+echo "Set vhost user: (if not set take vhost ID ${vhost_id})"
+echo "user will created if not exists"
+echo -n "vhost user:"
+read vhost_user
+vhost_user=${vhost_user:=${vhost_id}}
+echo "vhost_user: ${vhost_user}"
 
-echo ;
-echo "Set vhost group: (if not set take pool user ${vhost_user})";
+echo 
+echo "Set vhost group: (if not set take pool user ${vhost_user})"
 echo "for good manage assign all the www user to one group like 'www'!"
-echo -n "vhost group:";
-read vhost_group;
+echo -n "vhost group:"
+read vhost_group
 vhost_group=${vhost_group:=${vhost_user}}
-echo "vhost_group: ${vhost_group}";
+echo "vhost_group: ${vhost_group}"
 
-echo ;
-echo "Set nginx root dir: (if not set take vhost ID ${vhost_id})";
-echo "Set nginx root dir: (e.g. 'www_domain_com')";
-echo "dir name under ${ToySitesPath}";
-echo -n "(*) nginx root dir:";
-read ngx_root;
-ngx_root=${ngx_root:=${vhost_id}};
-ngx_root=${ToySitesPath}/${ngx_root}
-echo "ngx_root: ${ngx_root}";
+echo 
+echo "Set vhost root dir: (if not set take vhost ID ${vhost_id})"
+echo "Set vhost root dir: (e.g. 'www_domain_com')"
+echo "dir name under ${ToySitesPath}"
+echo -n "(*) vhost root dir:"
+read vhost_root
+vhost_root=${vhost_root:=${vhost_id}}
+vhost_root=${ToySitesPath}/${vhost_root}
+ngx_root=${vhost_root}/www
+echo "vhost_root: ${vhost_root}"
 
-if [ -d "${ngx_root}" ]; then
-  echo "${ngx_root} already exists"
+if [ -d "${vhost_root}" ]; then
+  echo "${vhost_root} already exists"
   exit 1
 fi
 
-echo ;
-echo "Set nginx server name";
-echo "e.g. 127.0.0.1 domain domain.com www.domain.com";
-echo -n "(*) nginx server name:";
-read ngx_server_name;
+echo 
+echo "Set nginx server name"
+echo "e.g. 127.0.0.1 domain domain.com www.domain.com"
+echo -n "(*) nginx server name:"
+read ngx_server_name
 if [ "${ngx_server_name:+1}" != 1 ]; then
-  echo "Error: Must input an server name for nginx vhost";
-  exit 1;
-fi;
-echo "ngx_server_name: ${ngx_server_name}";
+  echo "Error: Must input an server name for nginx vhost"
+  exit 1
+fi
+echo "ngx_server_name: ${ngx_server_name}"
 
-echo ;
-echo "Set nginx listen: (if not set take 80)";
-echo "if set as 80 and custom this vhost with SSL(following step)";
-echo "it will be redefined as 443";
-echo -n "nginx listen:";
-read ngx_listen;
-ngx_listen=${ngx_listen:=80};
-echo "ngx_listen: ${ngx_listen}";
+echo 
+echo "Set nginx listen: (if not set take 80)"
+echo "if set as 80 and custom this vhost with SSL(following step)"
+echo "it will be redefined as 443"
+echo -n "nginx listen:"
+read ngx_listen
+ngx_listen=${ngx_listen:=80}
+echo "ngx_listen: ${ngx_listen}"
+
+echo 
+echo "Set memcached port: (if not set take 11212)"
+echo -n "(*) memcached port:"
+read memcached_port
+memcached_port=${memcached_port:=11212}
+echo "memcached_port: ${memcached_port}"
+
+echo 
+echo "Set redis port: (if not set take 6379)"
+echo -n "(*) redis port:"
+read redis_port
+redis_port=${redis_port:=6379}
+echo "redis_port: ${redis_port}"
+
+echo 
+echo "Set elasticsearch port: (if not set take 9200)"
+echo -n "(*) elasticsearch port:"
+read elasticsearch_port
+elasticsearch_port=${elasticsearch_port:=9200}
+echo "elasticsearch_port: ${elasticsearch_port}"
+
+echo 
+echo "Set pure-ftpd port: (if not set take 21)"
+echo -n "(*) pure-ftpd port:"
+read ftp_port
+ftp_port=${ftp_port:=21}
+echo "ftp_port: ${ftp_port}"
+
+echo 
+echo "Set pure-ftpd password"
+echo -n "(*) pure-ftpd password:"
+read ftp_password
+if [ "${ftp_password:+1}" != 1 ]; then
+  echo "Error: Must input an password for ftp"
+  exit 1
+fi
+echo "ftp_password: ${ftp_password}"
+
+echo 
+echo "Set mariadb port: (if not set take 3306)"
+echo -n "(*) mariadb port:"
+read mariadb_port
+mariadb_port=${mariadb_port:=3306}
+echo "mariadb_port: ${mariadb_port}"
+
+echo 
+echo "Set mariadb password"
+echo -n "(*) mariadb password:"
+read mariadb_password
+if [ "${mariadb_password:+1}" != 1 ]; then
+  echo "Error: Must input an password for mariadb"
+  exit 1
+fi
+echo "mariadb_password: ${mariadb_password}"
+
+echo
+echo
+cat <<EOF
+Vhost ID: ${vhost_id}
+Vhost User: ${vhost_user}
+Vhost Group: ${vhost_group}
+Vhost Root: ${vhost_root}
+
+Nginx server_name: ${ngx_server_name}
+Nginx listen: ${ngx_listen}
+Nginx root: ${ngx_root}
+
+Memcached port: ${memcached_port}
+
+Redis port: ${redis_port}
+
+Elasticsearch port: ${elasticsearch_port}
+
+Pure-ftpd port: ${ftp_port}
+Pure-ftpd password: ${ftp_password}
+
+Mariadb port: ${mariadb_port}
+Mariadb password: ${mariadb_password}
+EOF
+echo
+echo
+
+read -p "Are you sure? [Y/n]" -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+
+  echo 
+  echo
+  echo "nginx"
+  . ./nginx group -v=1.14.2 -p=${vhost_root} -n=default -u=${vhost_user} -g=${vhost_group}
+  . ./nginx server -v=1.14.2 -p=${vhost_root} -n=default -s=www -P=${ngx_listen} -r=${ngx_root} --server-name="${ngx_server_name}"
+
+  echo 
+  echo
+  echo "memcached"
+  . ./memcached group -v=1.5.12 -p=${vhost_root}
+  . ./memcached server -v=1.5.12 -p=${vhost_root} -P=${memcached_port} -u=${vhost_user} -g=${vhost_group}
+
+  echo 
+  echo
+  echo "redis"
+  . ./redis group -v=5.0.4 -p=${vhost_root}
+  . ./redis server -v=5.0.4 -p=${vhost_root} -P=${redis_port}
+
+  echo 
+  echo
+  echo "elasticsearch"
+  . ./elasticsearch group -v=6.7.0 -p=${vhost_root}
+  . ./elasticsearch server -v=6.7.0 -p=${vhost_root} -P=${elasticsearch_port} -u=${vhost_user} -g=${vhost_group}
+
+  echo 
+  echo
+  echo "pure-ftpd"
+  . ./pure-ftpd group -v=1.0.48 -p=${vhost_root}
+  . ./pure-ftpd server -v=1.0.48 -p=${vhost_root} -P=${ftp_port}
+
+  echo "pure-ftpd user"
+  ${ToySoftPath}/pure-ftpd-1.0.48/bin/pure-pw useradd ${vhost_user} -u ${vhost_user} -g ${vhost_group} -d ${ngx_root} -f ${vhost_root}/pure-ftpd-1.0.48/data/${ftp_port}/pure-ftpd.passwd <<EOF
+${ftp_password}
+${ftp_password}
+EOF
+  ${ToySoftPath}/pure-ftpd-1.0.48/bin/pure-pw mkdb ${vhost_root}/pure-ftpd-1.0.48/data/${ftp_port}/pure-ftpd.pdb -f ${vhost_root}/pure-ftpd-1.0.48/data/${ftp_port}/pure-ftpd.passwd
+  ${ToySoftPath}/pure-ftpd-1.0.48/bin/pure-pw show ${vhost_user} -f ${vhost_root}/pure-ftpd-1.0.48/data/${ftp_port}/pure-ftpd.passwd
+
+  for ver in "7.2.16" "5.6.40" "5.4.45"; do
+  echo 
+  echo
+  echo "php ${ver}"
+  . ./php group -v="${ver}" -p=${vhost_root} -n=default
+  . ./php server -v="${ver}" -p=${vhost_root} -n=default -s=www -u=${vhost_user} -g=${vhost_group}
+  done
+
+  echo 
+  echo
+  echo "mariadb"
+  . ./mariadb group -v=10.3.13 -p=${vhost_root}
+  . ./mariadb server -v=10.3.13 -p=${vhost_root} -n=default -P=${mariadb_port} -u=${vhost_user} -g=${vhost_group} --password=${mariadb_password}
 
 
-mkdir -p ${ngx_root}
+  chown -R ${vhost_user}:${vhost_group} ${ngx_root}
+fi
 
-. ./nginx group -v=1.14.2 -p=${ngx_root} -n=default -u=${vhost_user} -g=${vhost_group}
-. ./nginx server -v=1.14.2 -p=${ngx_root} -n=default -s=www -P=${ngx_listen} -r=${ngx_root}/www --server-name="${ngx_server_name}"
-
-. ./memcached group -v=1.5.12 -p=${ngx_root}
-. ./memcached server -v=1.5.12 -p=${ngx_root} -P=11212 -u=${vhost_user} -g=${vhost_group}
-
-. ./redis group -v=5.0.4 -p=${ngx_root}
-. ./redis server -v=5.0.4 -p=${ngx_root} -P=6379
-
-. ./elasticsearch group -v=6.7.0 -p=${ngx_root}
-. ./elasticsearch server -v=6.7.0 -p=${ngx_root} -P=9200 -u=${vhost_user} -g=${vhost_group}
-
-. ./pure-ftpd group -v=1.0.48 -p=${ngx_root}
-. ./pure-ftpd server -v=1.0.48 -p=${ngx_root} -P=21
-
-. ./php group -v=7.2.16 -p=${ngx_root} -n=default
-. ./php server -v=7.2.16 -p=${ngx_root} -n=default -s=www -u=${vhost_user} -g=${vhost_group}
-
-. ./php group -v=5.6.40 -p=${ngx_root} -n=default
-. ./php server -v=5.6.40 -p=${ngx_root} -n=default -s=www -u=${vhost_user} -g=${vhost_group}
-
-. ./php group -v=5.4.45 -p=${ngx_root} -n=default
-. ./php server -v=5.4.45 -p=${ngx_root} -n=default -s=www -u=${vhost_user} -g=${vhost_group}
-
-. ./mariadb group -v=10.3.13 -p=${ngx_root}
-. ./mariadb server -v=10.3.13 -p=${ngx_root} -n=default -P=3306 -u=${vhost_user} -g=${vhost_group}
-
-${ToySoftPath}/pure-ftpd-1.0.48/bin/pure-pw useradd ${vhost_user} -u ${vhost_user} -g ${vhost_group} -d ${ngx_root}/www -f ${ngx_root}/pure-ftpd-1.0.48/data/21/pure-ftpd.passwd
-${ToySoftPath}/pure-ftpd-1.0.48/bin/pure-pw mkdb ${ngx_root}/pure-ftpd-1.0.48/data/21/pure-ftpd.pdb -f ${ngx_root}/pure-ftpd-1.0.48/data/21/pure-ftpd.passwd
-${ToySoftPath}/pure-ftpd-1.0.48/bin/pure-pw show ${vhost_user} -f ${ngx_root}/pure-ftpd-1.0.48/data/21/pure-ftpd.passwd
-
-chown -R ${vhost_user}:${vhost_group} ${ngx_root}/www
+exit 0

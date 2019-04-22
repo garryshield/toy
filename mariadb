@@ -11,7 +11,7 @@ help() {
     echo
     echo "    install <version>"
     echo "    group -v=<version> -p=<prefix>"
-    echo "    server -v=<version> -p=<prefix> -n=<name> -P=<port> -u=<user> -g=<group>"
+    echo "    server -v=<version> -p=<prefix> -n=<name> -P=<port> -u=<user> -g=<group> --password=<password>"
     echo
     # echo some stuff here for the -a or --add-options 
     exit 1
@@ -180,8 +180,9 @@ group(){
 # -P, --port
 # -u, --user
 # -g, --group
-# mariadb server -v=10.3.13 -p=/var/sites/www_test_com -n=www -P=3306 -u=mariadb-10.3.13 -g=www
-# mariadb server -v=10.3.13 -p=/var/sites/www_test_com -n=www -P=3307 -u=mariadb-10.3.13 -g=www
+# --password
+# mariadb server -v=10.3.13 -p=/var/sites/www_test_com -n=www -P=3306 -u=mariadb-10.3.13 -g=www --password=foobared
+# mariadb server -v=10.3.13 -p=/var/sites/www_test_com -n=www -P=3307 -u=mariadb-10.3.13 -g=www --password=foobared
 server(){
   for i in "$@"; do
   case $i in
@@ -209,13 +210,17 @@ server(){
       local Group="${i#*=}"
       shift
       ;;
+      --password=*)
+      local Password="${i#*=}"
+      shift
+      ;;
       *)
 
       ;;
   esac
   done
 
-  if [ -z "$Version" ] || [ -z "$Prefix" ] || [ -z "$Name" ] || [ -z "$Port" ]; then
+  if [ -z "$Version" ] || [ -z "$Prefix" ] || [ -z "$Name" ] || [ -z "$Port" ] || [ -z "$Password" ]; then
     help
     exit 1
   fi
@@ -313,15 +318,23 @@ server(){
   echo
   echo
   echo "my.cnf.d/mysql-clients.cnf"
-  /bin/cp ${ToyCnfPath}/${MariaDB}/my.cnf.d/mysql-clients.cnf ${ServerConfD}/mysql-clients.cnf
+  /bin/cp -v ${ToyCnfPath}/${MariaDB}/my.cnf.d/mysql-clients.cnf ${ServerConfD}/mysql-clients.cnf
 
   # user&group
   echo
   echo
-  getent group ${Group} &>/dev/null || (groupadd ${Group} && 
-    echo "groupadd ${Group}")
-  getent passwd ${User} &>/dev/null || (useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
-    echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}")
+  echo "user&group"
+  if getent group ${Group} &>/dev/null; then
+    echo "${Group} already exists"
+  else
+    groupadd ${Group} && echo "groupadd ${Group}"
+  fi
+  if getent passwd ${User} &>/dev/null; then
+    echo "${User} already exists"
+  else
+    useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
+      echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}"
+  fi
 
   # mysql_install_db
   # https://mariadb.com/kb/en/library/installing-system-tables-mysql_install_db/
@@ -334,18 +347,6 @@ server(){
   chown -R ${User}:${Group} ${ServerLog}
 
   ${MariaDBInstallPath}/scripts/mysql_install_db --basedir=${MariaDBInstallPath} --datadir=${ServerData} --user=${User}
-
-  # # security
-  # echo
-  # echo
-  # echo "security"
-  # SecuritySql="\
-  #   DELETE FROM mysql.user WHERE user=''; \
-  #   GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${MariaDBPassword}' WITH GRANT OPTION; \
-  #   UPDATE mysql.user SET password=PASSWORD('${MariaDBPassword}'); \
-  #   FLUSH PRIVILEGES; \
-  # "
-  # ${MariaDBInstallPath}/bin/mysql --defaults-file=${ServerConf} -uroot -e "${SecuritySql}"
 
   # mariadb@.server
   # https://mariadb.com/kb/en/library/systemd/
@@ -380,6 +381,38 @@ server(){
   }" ${NodeSystemd}/${MariaDB}@${UUID}.service
 
   systemctl enable ${NodeSystemd}/${MariaDB}@${UUID}.service
+
+  # security
+  echo
+  echo
+  echo "security"
+  local SecuritySql=`cat <<EOF
+DROP DATABASE test;
+DELETE FROM mysql.user WHERE user='';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${Password}' WITH GRANT OPTION;
+UPDATE mysql.user SET password=PASSWORD('${Password}');
+SELECT User,Host,Password FROM mysql.user;
+FLUSH PRIVILEGES;
+EOF
+`
+
+  echo "${SecuritySql}"
+  systemctl start ${MariaDB}@${UUID}.service
+  ${MariaDBInstallPath}/bin/mysql --defaults-file=${ServerConf} -e "${SecuritySql}"
+  systemctl stop ${MariaDB}@${UUID}.service
+
+  # firewall
+  echo
+  echo
+  echo "firewall"
+  if firewall-cmd --list-ports --zone=public | grep ${Port}/tcp &>/dev/null; then
+    echo "${Port} already exists"
+  else
+    firewall-cmd --permanent --zone=public --add-port=${Port}/tcp &&
+      echo "firewall-cmd --permanent --zone=public --add-port=${Port}/tcp"
+    firewall-cmd --reload &&
+      echo "firewall-cmd --reload"
+  fi
 
   echo
   return 0

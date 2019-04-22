@@ -12,6 +12,10 @@ if [ $(id -u) != "0" ]; then
   exit 1
 fi
 
+# Color
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
 TOY="toy-1.0.0"
 
 # Header prompt

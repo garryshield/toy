@@ -329,10 +329,18 @@ group() {
   # user&group
   echo
   echo
-  getent group ${Group} &>/dev/null || (groupadd ${Group} && 
-    echo "groupadd ${Group}")
-  getent passwd ${User} &>/dev/null || (useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
-    echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}")
+  echo "user&group"
+  if getent group ${Group} &>/dev/null; then
+    echo "${Group} already exists"
+  else
+    groupadd ${Group} && echo "groupadd ${Group}"
+  fi
+  if getent passwd ${User} &>/dev/null; then
+    echo "${User} already exists"
+  else
+    useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
+      echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}"
+  fi
 
   # chown -R ${User}:${Group} ${GroupData}
   # chown -R ${User}:${Group} ${GroupEtc}
@@ -398,6 +406,8 @@ server() {
   local Nginx=nginx-$Version
   local NginxInstallPath=${ToySoftPath}/${Nginx}
 
+  local Port=${Port:-80}
+
   if [ ! -d "${NginxInstallPath}" ]; then
     echo "${Nginx} is not installed yet"
     exit 1
@@ -424,7 +434,6 @@ server() {
   local ServerEtc=${GroupEtc}/conf.d/${Server}.conf
   local ServerAccessLog=${GroupLog}/${Server}.access.log
   local ServerErrorLog=${GroupLog}/${Server}.error.log
-  local ServerPort=${Port:-80}
   local ServerRoot=${Root:-${GroupData}/${Server}}
   local ServerName="${ServerName:-localhost}"
 
@@ -450,7 +459,7 @@ server() {
   /bin/cp -v ${ToyCnfPath}/${Nginx}/www.conf ${ServerEtc}
 
   sed -i "/@PORT@/{
-    s::${ServerPort}:g
+    s::${Port}:g
     w /dev/stdout
   }" ${ServerEtc}
   sed -i "/server_name localhost;/{
@@ -473,12 +482,15 @@ server() {
   # firewall
   echo
   echo
-  [[ $(firewall-cmd --list-ports --zone=public | grep ${ServerPort}/tcp) ]] || (
-      firewall-cmd --permanent --zone=public --add-port=${ServerPort}/tcp && 
-      echo "firewall-cmd --permanent --zone=public --add-port=${ServerPort}/tcp" &&
-      firewall-cmd --reload &&
+  echo "firewall"
+  if firewall-cmd --list-ports --zone=public | grep ${Port}/tcp &>/dev/null; then
+    echo "${Port} already exists"
+  else
+    firewall-cmd --permanent --zone=public --add-port=${Port}/tcp &&
+      echo "firewall-cmd --permanent --zone=public --add-port=${Port}/tcp"
+    firewall-cmd --reload &&
       echo "firewall-cmd --reload"
-    )
+  fi
 
   echo
   return 0

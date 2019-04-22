@@ -210,6 +210,7 @@ server(){
   # config
   echo
   echo
+  echo "config"
   /bin/cp -v ${ToyCnfPath}/${ES}/config/* ${ServerEtcPath}
 
   sed -i "/^#path.data\: \/path\/to\/data/{
@@ -270,10 +271,18 @@ server(){
   # user&group
   echo
   echo
-  getent group ${Group} &>/dev/null || (groupadd ${Group} && 
-    echo "groupadd ${Group}")
-  getent passwd ${User} &>/dev/null || (useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
-    echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}")
+  echo "user&group"
+  if getent group ${Group} &>/dev/null; then
+    echo "${Group} already exists"
+  else
+    groupadd ${Group} && echo "groupadd ${Group}"
+  fi
+  if getent passwd ${User} &>/dev/null; then
+    echo "${User} already exists"
+  else
+    useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User} &&
+      echo "useradd -s /sbin/nologin -d /dev/null -M -g ${Group} ${User}"
+  fi
 
   chown -R ${User}:${Group} ${ServerDataPath}
   chown -R ${User}:${Group} ${ServerEtcPath}
