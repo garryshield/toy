@@ -44,38 +44,51 @@ cd toy
 ```
 
 # ssh
+```
 ./ssh install [port]
+```
 
 # nginx
+```
 ./nginx install <version>
 ./nginx group -v=<version> -p=<prefix> -n=<name> -u=<user> -g=<group>
 ./nginx server -v=<version> -p=<prefix> -n=<name> -u=<user> -g=<group>
+```
 
 # mariadb
+```
 ./mariadb install <version>
 ./mariadb group -v=<version> -p=<prefix>
 ./mariadb server -v=<version> -p=<prefix> -n=<name> -P=<port> -u=<user> -g=<group> --password=<password>
+```
 
 # pure-ftpd
+```
 ./pure-ftpd install <version>
 ./pure-ftpd group -v=<version> -p=<prefix>
 ./pure-ftpd server -v=<version> -p=<prefix> -P=<port>
+```
 
 # memcached
+```
 ./memcached install <version>
 ./memcached group -v=<version> -p=<prefix>
 ./memcached server -v=<version> -p=<prefix> -P=<port> -u=<user> -g=<group>
+```
 
 # redis
+```
 ./redis install <version>
 ./redis group -v=<version> -p=<prefix>
 ./redis server -v=<version> -p=<prefix> -P=<port>
+```
 
 #elasticsearch
+```
 ./elasticsearch install <version>
 ./elasticsearch group -v=<version> -p=<prefix>
 ./elasticsearch server -v=<version> -p=<prefix> -P=<port> -u=<user> -g=<group>
-
+```
 
 # vhost
 默认端口
@@ -170,7 +183,7 @@ scp -r -P <port> <username>@<host>:/root/.ssh/ <dist>
 
 # php vhost 结构
 /var/sites/<VHOST_ID>/php-<Version>
-···
+```
 .
 ├── data
 │   └── default
